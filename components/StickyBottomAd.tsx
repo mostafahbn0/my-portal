@@ -18,11 +18,9 @@ export default function StickyBottomAd() {
         >
           <X className="w-3.5 h-3.5" />
         </button>
-        
-        {/* Placeholder or injected responsive ad code */}
         <div className="w-full flex justify-center items-center py-1">
           <div className="w-full max-w-[728px] h-[50px] md:h-[60px] bg-slate-900 border border-dashed border-slate-700 rounded-lg flex items-center justify-center text-xs text-slate-400 font-semibold">
-            <span>مساحة إعلانية عائمة (Sticky Banner 728x90 / 320x50)</span>
+            <span>مساحة إعلانية عائمة (Sticky Banner 728x90)</span>
           </div>
         </div>
       </div>
