@@ -2,5 +2,17 @@
 @tailwind components;
 @tailwind utilities;
 
-body { background: #08080a; color: white; overflow-x: hidden; }
-.no-scrollbar::-webkit-scrollbar { display: none; }
+:root {
+  --background: 0 0% 3.9%;
+  --foreground: 0 0% 98%;
+}
+
+body {
+  background-color: #08080a;
+  color: white;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.dir-rtl {
+  direction: rtl;
+}
