@@ -61,7 +61,6 @@ export default function WatchPage() {
     loadWork();
   }, [id]);
 
-  // تشغيل مباشر وسلس بدون إعلانات منبثقة مزعجة
   const handleStartWatching = () => {
     setShowPlayer(true);
     setTimeout(() => {
@@ -82,28 +81,28 @@ export default function WatchPage() {
   const backdrop = getMediaBackdrop(media);
   const year = getMediaYear(media) || (tmdbData?.release_date ? tmdbData.release_date.split('-')[0] : '') || (tmdbData?.first_air_date ? tmdbData.first_air_date.split('-')[0] : '');
   const rating = getMediaRating(media) !== '0.0' ? getMediaRating(media) : (tmdbData?.vote_average ? Number(tmdbData.vote_average).toFixed(1) : '7.0');
-  const overview = media.overview || media.description || tmdbData?.overview || 'شاهد العمل بجودة فائقة الدقة وبترجمة عربية احترافية وسيرفرات نظيفة بدون إعلانات.';
+  const overview = media.overview || media.description || tmdbData?.overview || 'شاهد العمل بجودة فائقة الدقة وبترجمة عربية احترافية.';
   const title = media.title || media.name || tmdbData?.title || tmdbData?.name;
 
-  // سيرفرات حديثة نقية بدون إعلانات مبوبة + دعم الترجمة العربية
+  // سيرفرات البث المتوافقة
   const servers = [
     { 
-      name: 'سيرفر VidLink VIP (ترجمة عربية + فائق السرعة)', 
+      name: 'سيرفر VidLink VIP (ترجمة عربية تلقائية)', 
       url: isMovie 
-        ? `https://vidlink.pro/movie/${media.tmdb_id}?primaryColor=dc2626&secondaryColor=08080a&iconColor=ffffff&icons=default&title=true&poster=true`
-        : `https://vidlink.pro/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}?primaryColor=dc2626&secondaryColor=08080a&iconColor=ffffff&icons=default&title=true&poster=true`
+        ? `https://vidlink.pro/movie/${media.tmdb_id}?primaryColor=dc2626&secondaryColor=08080a&iconColor=ffffff`
+        : `https://vidlink.pro/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}?primaryColor=dc2626&secondaryColor=08080a&iconColor=ffffff`
     },
     { 
-      name: 'سيرفر EmbedSU (بدون إعلانات مزعجة)', 
+      name: 'سيرفر EmbedSU (متعدد الجودات)', 
       url: isMovie 
         ? `https://embed.su/embed/movie/${media.tmdb_id}` 
         : `https://embed.su/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` 
     },
     { 
-      name: 'سيرفر VidSrc PRO الاحتياطي', 
+      name: 'سيرفر AutoEmbed السريع', 
       url: isMovie 
-        ? `https://vidsrc.pro/embed/movie/${media.tmdb_id}` 
-        : `https://vidsrc.pro/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` 
+        ? `https://player.autoembed.cc/embed/movie/${media.tmdb_id}` 
+        : `https://player.autoembed.cc/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` 
     }
   ];
 
@@ -194,12 +193,12 @@ export default function WatchPage() {
 
       <div className="container mx-auto px-4 py-8">
         
-        {/* شاشة العرض وسيرفرات البث النظيفة */}
+        {/* شاشة العرض وسيرفرات البث */}
         {showPlayer && (
           <div id="player-screen" className="mb-12 scroll-mt-20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <span className="font-bold text-sm text-red-500 flex items-center gap-2">
-                <Film size={18} /> اختر سيرفر البث السريع:
+                <Film size={18} /> سيرفر المشاهدة المباشر:
               </span>
               <div className="flex flex-wrap gap-1.5 bg-white/5 p-1 rounded-lg border border-white/10">
                 {servers.map((s, idx) => (
@@ -214,23 +213,22 @@ export default function WatchPage() {
               </div>
             </div>
 
-            {/* شاشة الفيديو مزودة بحماية تمنع الإعلانات المنبثقة من اختطاف المتصفح */}
+            {/* تم إزالة Sandbox نهائياً ليعمل المشغل بكفاءة وبدون أخطاء */}
             <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
               <iframe
                 src={servers[activeServer]?.url}
                 className="w-full h-full"
                 allowFullScreen
-                allow="autoplay; encrypted-media; fullscreen"
-                sandbox="allow-forms allow-scripts allow-same-origin allow-presentation"
+                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
               />
             </div>
 
             <div className="mt-3 bg-[#121216] border border-white/5 rounded-xl p-3 flex items-center justify-between text-xs text-gray-400">
               <div className="flex items-center gap-2 text-green-400">
                 <CheckCircle2 size={16} />
-                <span>مشغل نظيف بدون إعلانات مزعجة مدمجة، والترجمة مجهزة تلقائياً.</span>
+                <span>مشغل سريع يدعم الترجمة العربية تلقائياً والتحكم في الجودة.</span>
               </div>
-              <span className="text-gray-500 hidden sm:inline">سيرفر: {servers[activeServer]?.name.split(' ')[1]}</span>
+              <span className="text-gray-500 hidden sm:inline">سيرفر نشط</span>
             </div>
           </div>
         )}
@@ -280,7 +278,7 @@ export default function WatchPage() {
           </div>
         )}
 
-        {/* طاقم التمثيل والتحميل المباشر */}
+        {/* طاقم التمثيل وروابط التحميل */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             {tmdbData?.credits?.cast && (
@@ -355,9 +353,9 @@ export default function WatchPage() {
             <AdBanner type="rectangle" />
             <div className="bg-[#121216] border border-white/5 p-4 rounded-xl text-xs space-y-2 text-gray-400">
               <div className="flex items-center gap-2 text-green-400 font-bold mb-1">
-                <ShieldCheck size={16} /> تجربة مشاهدة آمنة
+                <ShieldCheck size={16} /> بث مباشر سريع
               </div>
-              <p>تم تفعيل خاصية عزل الإعلانات المنبثقة لضمان تشغيل الفيديو بدون أي توجيه مزعج أو صفحات خارجية.</p>
+              <p>تم تحديث المشغل ليعمل بأعلى كفاءة وسرعة على جميع الهواتف والمتصفحات.</p>
             </div>
           </aside>
         </div>
