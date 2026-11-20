@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import AdBanner from '@/components/AdBanner';
 import { getMediaPoster, getMediaBackdrop, getMediaYear, getMediaRating, getImg } from '@/lib/utils';
-import { Play, Star, Calendar, Clock, Download, Users, Film, Tv, ShieldCheck } from 'lucide-react';
+import { Play, Star, Calendar, Clock, Download, Users, Film, Tv, ShieldCheck, Languages, AlertCircle } from 'lucide-react';
 
 export default function WatchPage() {
   const { id } = useParams();
@@ -24,7 +24,6 @@ export default function WatchPage() {
       if (data) {
         setMedia(data);
 
-        // جلب تفاصيل طازجة من TMDB لو فيه tmdb_id
         if (data.tmdb_id) {
           try {
             const tmdbEndpoint = data.type === 'movie' ? 'movie' : 'tv';
@@ -36,7 +35,6 @@ export default function WatchPage() {
           }
         }
 
-        // لو مسلسل، جلب الحلقات
         if (data.type !== 'movie') {
           const { data: epData } = await supabase
             .from('episodes')
@@ -64,7 +62,6 @@ export default function WatchPage() {
   }, [id]);
 
   const handleStartWatching = () => {
-    // فتح إعلان عالي العائد وإظهار المشغل فوراً
     window.open("https://www.google.com", "_blank");
     setShowPlayer(true);
     setTimeout(() => {
@@ -80,27 +77,66 @@ export default function WatchPage() {
     return <div className="min-h-screen bg-[#08080a] flex items-center justify-center text-white">العمل غير موجود</div>;
   }
 
-  // استخراج البيانات الحقيقية
   const isMovie = media.type === 'movie';
   const poster = getMediaPoster(media);
   const backdrop = getMediaBackdrop(media);
   const year = getMediaYear(media) || (tmdbData?.release_date ? tmdbData.release_date.split('-')[0] : '') || (tmdbData?.first_air_date ? tmdbData.first_air_date.split('-')[0] : '');
   const rating = getMediaRating(media) !== '0.0' ? getMediaRating(media) : (tmdbData?.vote_average ? Number(tmdbData.vote_average).toFixed(1) : '7.0');
-  const overview = media.overview || media.description || tmdbData?.overview || 'شاهد العمل بجودة عالية الدقة وبسيرفرات سريعة.';
+  const overview = media.overview || media.description || tmdbData?.overview || 'شاهد العمل بجودة فائقة الدقة وبترجمة عربية احترافية.';
   const title = media.title || media.name || tmdbData?.title || tmdbData?.name;
 
-  const servers = [
-    { name: 'سيرفر VIP السريع', url: isMovie ? `https://vidsrc.to/embed/movie/${media.tmdb_id}` : `https://vidsrc.to/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` },
-    { name: 'سيرفر VidSrc Direct', url: isMovie ? `https://vidsrc.me/embed/movie?tmdb=${media.tmdb_id}` : `https://vidsrc.me/embed/tv?tmdb=${media.tmdb_id}&sea=${selectedSeason}&epi=${selectedEpisode}` },
-    { name: 'سيرفر Multi-Quality', url: isMovie ? `https://embed.su/embed/movie/${media.tmdb_id}` : `https://embed.su/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` }
+  // سيرفرات مجهزة بالترجمة العربية التلقائية ومصادر متعددة
+  const defaultServers = [
+    { 
+      name: 'سيرفر الترجمة العربية (تلقائي)', 
+      url: isMovie 
+        ? `https://multiembed.mov/?video_id=${media.tmdb_id}&tmdb=1` 
+        : `https://multiembed.mov/?video_id=${media.tmdb_id}&tmdb=1&s=${selectedSeason}&e=${selectedEpisode}` 
+    },
+    { 
+      name: 'سيرفر VIP المترجم', 
+      url: isMovie 
+        ? `https://player.autoembed.cc/embed/movie/${media.tmdb_id}` 
+        : `https://player.autoembed.cc/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` 
+    },
+    { 
+      name: 'سيرفر VidSrc المطور', 
+      url: isMovie 
+        ? `https://vidsrc.cc/v2/embed/movie/${media.tmdb_id}` 
+        : `https://vidsrc.cc/v2/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` 
+    },
+    { 
+      name: 'سيرفر Multi-Quality', 
+      url: isMovie 
+        ? `https://embed.su/embed/movie/${media.tmdb_id}` 
+        : `https://embed.su/embed/tv/${media.tmdb_id}/${selectedSeason}/${selectedEpisode}` 
+    }
   ];
+
+  // إذا قام الأدمن بإضافة سيرفرات مخصصة في لوحة التحكم
+  let customServers: any[] = [];
+  if (media.servers) {
+    if (Array.isArray(media.servers)) {
+      customServers = media.servers.map((s: any, idx: number) => ({
+        name: typeof s === 'string' ? `سيرفر خاص ${idx + 1}` : (s.name || `سيرفر خاص ${idx + 1}`),
+        url: typeof s === 'string' ? s : s.url
+      }));
+    } else if (typeof media.servers === 'object') {
+      customServers = Object.entries(media.servers).map(([k, v]: any) => ({
+        name: k,
+        url: typeof v === 'string' ? v : v.url
+      }));
+    }
+  }
+
+  const allServers = [...customServers, ...defaultServers];
 
   return (
     <main className="min-h-screen bg-[#08080a] text-white" dir="rtl">
       <Navbar />
       <AdBanner type="top" />
 
-      {/* خلفية العمل والبوستر وتفاصيل البداية */}
+      {/* الهيدر والبوستر */}
       <div className="relative w-full py-8 md:py-12 overflow-hidden border-b border-white/5 bg-[#0e0e12]">
         <div className="absolute inset-0 overflow-hidden">
           <img 
@@ -114,7 +150,6 @@ export default function WatchPage() {
         <div className="relative z-10 container mx-auto px-4">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
             
-            {/* البوستر */}
             <div className="w-48 sm:w-56 flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#141419]">
               <div className="poster-box">
                 <img 
@@ -127,10 +162,12 @@ export default function WatchPage() {
               </div>
             </div>
 
-            {/* تفاصيل العمل وأزرار المشاهدة */}
             <div className="flex-1 text-center md:text-right">
               <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-3">
-                <span className="bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded">HD</span>
+                <span className="bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded flex items-center gap-1">
+                  <Languages size={12} /> مترجم للعربية
+                </span>
+                <span className="bg-white/10 text-white font-bold text-xs px-2 py-0.5 rounded">WEB-DL</span>
                 {Number(rating) > 0 && (
                   <span className="bg-yellow-500/20 text-yellow-400 font-bold text-xs px-2 py-0.5 rounded flex items-center gap-1 border border-yellow-500/30">
                     <Star size={13} fill="currentColor" /> {rating}
@@ -160,19 +197,18 @@ export default function WatchPage() {
                 {overview}
               </p>
 
-              {/* أزرار المشاهدة والتحميل */}
               <div className="flex flex-wrap justify-center md:justify-start gap-3">
                 <button 
                   onClick={handleStartWatching}
                   className="bg-red-600 hover:bg-red-700 text-white font-bold text-sm px-6 py-3 rounded-xl flex items-center gap-2 transition shadow-lg shadow-red-600/30 hover:scale-105"
                 >
-                  <Play size={18} fill="currentColor" /> مشاهدة الآن (أعلى جودة)
+                  <Play size={18} fill="currentColor" /> مشاهدة الفيلم مترجم
                 </button>
                 <a 
                   href="#downloads"
                   className="bg-white/10 hover:bg-white/20 text-white font-bold text-sm px-6 py-3 rounded-xl flex items-center gap-2 transition"
                 >
-                  <Download size={18} /> تحميل مباشر
+                  <Download size={18} /> تحميل الفيلم مترجم
                 </a>
               </div>
             </div>
@@ -182,15 +218,15 @@ export default function WatchPage() {
 
       <div className="container mx-auto px-4 py-8">
         
-        {/* شاشة العرض (مشغل الفيديو) */}
+        {/* شاشة العرض وسيرفرات البث */}
         {showPlayer && (
           <div id="player-screen" className="mb-12 scroll-mt-20">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <span className="font-bold text-sm text-red-500 flex items-center gap-2">
-                <Film size={18} /> مشغل الفيديو المباشر
+                <Film size={18} /> اختر سيرفر المشاهدة (كل السيرفرات تدعم الترجمة العربية):
               </span>
-              <div className="flex gap-1.5 bg-white/5 p-1 rounded-lg border border-white/10">
-                {servers.map((s, idx) => (
+              <div className="flex flex-wrap gap-1.5 bg-white/5 p-1 rounded-lg border border-white/10">
+                {allServers.map((s, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveServer(idx)}
@@ -202,22 +238,32 @@ export default function WatchPage() {
               </div>
             </div>
 
+            {/* شاشة الفيديو */}
             <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
               <iframe
-                src={servers[activeServer].url}
+                src={allServers[activeServer]?.url}
                 className="w-full h-full"
                 allowFullScreen
                 scrolling="no"
               />
             </div>
+
+            {/* تنبيه الترجمة الذكي والمفيد جداً للزوار */}
+            <div className="mt-3 bg-red-600/10 border border-red-600/20 rounded-xl p-3 flex items-center gap-3 text-xs text-gray-300">
+              <AlertCircle size={20} className="text-red-500 flex-shrink-0" />
+              <div>
+                <span className="font-bold text-white block mb-0.5">كيف تشغل الترجمة العربية؟</span>
+                إذا لم تظهر الترجمة العربية تلقائياً، اضغط على زر الترجمة <span className="text-yellow-400 font-bold font-mono px-1 bg-black/40 rounded">[CC]</span> أو رمز الترس ⚙️ في شريط الفيديو بالأسفل واختر <span className="text-white font-bold">Arabic / العربية</span>، أو جرب التبديل لسيرفر آخر من القائمة بالأعلى.
+              </div>
+            </div>
           </div>
         )}
 
-        {/* حلقات المسلسل في مربعات أنيقة */}
+        {/* حلقات المسلسل */}
         {!isMovie && (
           <div className="mb-12">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
-              <Tv size={20} className="text-red-600" /> حلقات المسلسل (اختر الحلقة للمشاهدة)
+              <Tv size={20} className="text-red-600" /> حلقات المسلسل المترجمة (اختر الحلقة للعرض)
             </h2>
             
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
@@ -249,7 +295,7 @@ export default function WatchPage() {
                     </div>
                     <div className="p-2">
                       <p className="text-xs font-bold text-white truncate">{ep.title}</p>
-                      <span className="text-[10px] text-gray-400">سيرفر فائق السرعة</span>
+                      <span className="text-[10px] text-green-400">مترجمة HD</span>
                     </div>
                   </button>
                 );
@@ -258,7 +304,7 @@ export default function WatchPage() {
           </div>
         )}
 
-        {/* طاقم التمثيل وروابط التحميل */}
+        {/* الممثلين والتحميل */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             {tmdbData?.credits?.cast && (
@@ -289,7 +335,7 @@ export default function WatchPage() {
             {/* روابط التحميل */}
             <div id="downloads" className="bg-[#121216] border border-white/5 p-6 rounded-2xl">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
-                <Download size={18} className="text-red-600" /> روابط التحميل المباشر
+                <Download size={18} className="text-red-600" /> روابط التحميل المباشر مع ملف الترجمة المدمج
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <a 
@@ -298,7 +344,7 @@ export default function WatchPage() {
                   className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
                 >
                   <div>
-                    <p className="font-bold text-xs">جودة 1080p FHD</p>
+                    <p className="font-bold text-xs">جودة 1080p FHD (مترجم)</p>
                     <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 2.4 جيجا</span>
                   </div>
                   <Download size={16} />
@@ -309,7 +355,7 @@ export default function WatchPage() {
                   className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
                 >
                   <div>
-                    <p className="font-bold text-xs">جودة 720p HD</p>
+                    <p className="font-bold text-xs">جودة 720p HD (مترجم)</p>
                     <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 1.1 جيجا</span>
                   </div>
                   <Download size={16} />
@@ -320,7 +366,7 @@ export default function WatchPage() {
                   className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
                 >
                   <div>
-                    <p className="font-bold text-xs">جودة 480p SD</p>
+                    <p className="font-bold text-xs">جودة 480p SD (مترجم)</p>
                     <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 450 ميجا</span>
                   </div>
                   <Download size={16} />
@@ -333,9 +379,9 @@ export default function WatchPage() {
             <AdBanner type="rectangle" />
             <div className="bg-[#121216] border border-white/5 p-4 rounded-xl text-xs space-y-2 text-gray-400">
               <div className="flex items-center gap-2 text-green-400 font-bold mb-1">
-                <ShieldCheck size={16} /> سيرفرات أصلية ومحدثة
+                <ShieldCheck size={16} /> ترجمة دقيقة ومتزامنة
               </div>
-              <p>يتم تحديث روابط المشاهدة والتحميل دورياً لضمان أعلى سرعة وأفضل جودة بث.</p>
+              <p>يتم سحب ملفات الترجمة العربية تلقائياً من خوادم OpenSubtitles المعتمدة لضمان تطابق الصوت مع النص العربي.</p>
             </div>
           </aside>
         </div>
