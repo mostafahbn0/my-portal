@@ -1,177 +1,139 @@
-"use client";
-import React, { useState, useEffect, Suspense } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+'use client';
+
+import { Suspense, useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import MovieCard from '@/components/MovieCard';
 import AdBanner from '@/components/AdBanner';
-import { Film, Tv, Sparkles, Filter, Search } from 'lucide-react';
+import { Search, Filter, Film, Tv, Flame } from 'lucide-react';
 
 function ExploreContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
-
-  const typeParam = searchParams.get('type') || 'all';
   const queryParam = searchParams.get('q') || '';
-  const genreParam = searchParams.get('genre') || 'all';
+  const categoryParam = searchParams.get('cat') || '';
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedType, setSelectedType] = useState(typeParam);
-  const [selectedGenre, setSelectedGenre] = useState(genreParam);
-  const [searchQuery, setSearchQuery] = useState(queryParam);
-
-  const genres = ['الكل', 'أكشن', 'كوميدي', 'دراما', 'رعب', 'خيال علمي', 'أنمي', 'مغامرة', 'جريمة', 'عائلي'];
+  const [searchTerm, setSearchTerm] = useState(queryParam);
+  const [selectedType, setSelectedType] = useState(categoryParam || 'all');
 
   useEffect(() => {
-    setSelectedType(typeParam);
-    setSearchQuery(queryParam);
-    setSelectedGenre(genreParam);
-  }, [typeParam, queryParam, genreParam]);
-
-  useEffect(() => {
-    async function fetchMedia() {
+    async function fetchData() {
       setLoading(true);
-      let query = supabase.from('media').select('*');
+      try {
+        let query = supabase.from('media').select('*');
 
-      if (selectedType !== 'all') {
-        query = query.eq('type', selectedType);
-      }
+        // بحث مزدوج فوري (عربي + إنجليزي)
+        if (searchTerm.trim()) {
+          const q = searchTerm.trim();
+          query = query.or(`title.ilike.%${q}%,original_title.ilike.%${q}%`);
+        }
 
-      // البحث ثنائي اللغة (العربي أو الإنجليزي)
-      if (searchQuery.trim() !== '') {
-        const clean = searchQuery.trim();
-        query = query.or(`title.ilike.%${clean}%,original_title.ilike.%${clean}%`);
-      }
+        // فلترة بالنوع
+        if (selectedType === 'movies') {
+          query = query.eq('media_type', 'movie');
+        } else if (selectedType === 'series') {
+          query = query.or('media_type.eq.series,media_type.eq.tv');
+        }
 
-      const { data } = await query.order('created_at', { ascending: false });
+        query = query.order('id', { ascending: false }).limit(60);
 
-      if (data && data.length > 0) {
-        if (selectedGenre !== 'all') {
-          const filtered = data.filter((item: any) => 
-            item.genres && Array.isArray(item.genres) && item.genres.includes(selectedGenre)
-          );
-          setItems(filtered);
-        } else {
+        const { data, error } = await query;
+        if (!error && data) {
           setItems(data);
         }
-      } else {
-        setItems([]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
 
-    fetchMedia();
-  }, [selectedType, selectedGenre, searchQuery]);
-
-  const handleTypeChange = (type: string) => {
-    setSelectedType(type);
-    router.push(`/explore?type=${type}&genre=${selectedGenre}&q=${encodeURIComponent(searchQuery)}`);
-  };
-
-  const handleGenreChange = (genre: string) => {
-    setSelectedGenre(genre);
-    router.push(`/explore?type=${selectedType}&genre=${genre}&q=${encodeURIComponent(searchQuery)}`);
-  };
-
-  const getPageTitle = () => {
-    if (searchQuery) return `نتائج البحث عن: "${searchQuery}"`;
-    if (selectedType === 'movie') return 'الأفلام السينمائية';
-    if (selectedType === 'series') return 'المسلسلات التلفزيونية';
-    if (selectedType === 'anime') return 'عالم الأنمي المترجم';
-    return 'جميع الأعمال المتوفرة';
-  };
+    const timer = setTimeout(fetchData, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm, selectedType]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-2 border-r-4 border-red-600 pr-3">
-            {getPageTitle()}
-          </h1>
-          <p className="text-gray-400 text-xs mt-1">تصفح أحدث الأعمال بجودة عالية وباللغتين العربية والإنجليزية</p>
+    <div className="min-h-screen bg-[#08080a] text-white">
+      <Navbar />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* عنوان الصفحة وشريط البحث */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-black text-white">مكتبة الأعمال السينمائية</h1>
+            <p className="text-sm text-gray-400 mt-1">ابحث وتصفح أحدث الأفلام والمسلسلات المترجمة بأعلى دقة</p>
+          </div>
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* حقل البحث داخل الصفحة */}
+            <div className="relative flex-1 md:w-80">
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="ابحث بالاسم الحقيقي أو العربي..."
+                className="w-full bg-[#121318] text-sm text-white rounded-xl pl-4 pr-10 py-2.5 border border-white/10 focus:border-red-600 focus:outline-none"
+              />
+              <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            </div>
+
+            {/* أزرار الفلترة */}
+            <div className="flex items-center gap-1.5 bg-[#121318] p-1 rounded-xl border border-white/10 text-xs font-bold">
+              <button
+                onClick={() => setSelectedType('all')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${selectedType === 'all' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                الكل
+              </button>
+              <button
+                onClick={() => setSelectedType('movies')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${selectedType === 'movies' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                أفلام
+              </button>
+              <button
+                onClick={() => setSelectedType('series')}
+                className={`px-3 py-1.5 rounded-lg transition-all ${selectedType === 'series' ? 'bg-red-600 text-white' : 'text-gray-400 hover:text-white'}`}
+              >
+                مسلسلات
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-fit">
-          <button 
-            onClick={() => handleTypeChange('all')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition ${selectedType === 'all' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            الكل
-          </button>
-          <button 
-            onClick={() => handleTypeChange('movie')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 ${selectedType === 'movie' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <Film size={14} /> الأفلام
-          </button>
-          <button 
-            onClick={() => handleTypeChange('series')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 ${selectedType === 'series' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <Tv size={14} /> المسلسلات
-          </button>
-          <button 
-            onClick={() => handleTypeChange('anime')}
-            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1 ${selectedType === 'anime' ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-          >
-            <Sparkles size={14} /> الأنمي
-          </button>
+        {/* عرض النتائج */}
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-pulse">
+            {[...Array(12)].map((_, i) => (
+              <div key={i} className="aspect-[2/3] bg-white/5 rounded-xl" />
+            ))}
+          </div>
+        ) : items.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {items.map((item) => (
+              <MovieCard key={item.id} item={item} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-20 text-gray-400">
+            <p className="text-lg">لم يتم العثور على أي أعمال مطابقة لبحثك.</p>
+          </div>
+        )}
+
+        <div className="my-10">
+          <AdBanner slot="explore-bottom" />
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none mb-6">
-        <span className="text-xs text-gray-500 font-bold flex items-center gap-1 flex-shrink-0 ml-2">
-          <Filter size={14} /> التصنيف:
-        </span>
-        {genres.map((g) => (
-          <button
-            key={g}
-            onClick={() => handleGenreChange(g)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition border ${
-              (selectedGenre === g || (g === 'الكل' && selectedGenre === 'all'))
-                ? 'bg-red-600/20 text-red-500 border-red-600'
-                : 'bg-white/5 border-white/5 text-gray-300 hover:border-white/20'
-            }`}
-          >
-            {g}
-          </button>
-        ))}
-      </div>
-
-      <AdBanner type="top" />
-
-      {loading ? (
-        <div className="py-20 text-center text-red-600 font-bold">جاري تحميل الأعمال...</div>
-      ) : items.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
-          {items.map((movie) => (
-            <MovieCard key={movie.id} movie={movie} />
-          ))}
-        </div>
-      ) : (
-        <div className="py-24 text-center bg-white/5 rounded-2xl border border-dashed border-white/10 p-8">
-          <Search size={40} className="mx-auto text-gray-500 mb-3 opacity-40" />
-          <h3 className="text-lg font-bold text-white mb-1">لم نعثر على أي نتائج</h3>
-          <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            تأكد من كتابة الاسم بشكل صحيح سواء بالعربية أو بالإنجليزية.
-          </p>
-        </div>
-      )}
-
-      <AdBanner type="inline" />
+      </main>
     </div>
   );
 }
 
 export default function ExplorePage() {
   return (
-    <main className="min-h-screen bg-[#08080a] text-white" dir="rtl">
-      <Navbar />
-      <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-red-600 font-bold">جاري التحميل...</div>}>
-        <ExploreContent />
-      </Suspense>
-      <AdBanner type="sticky" />
-    </main>
+    <Suspense fallback={<div className="min-h-screen bg-[#08080a] flex items-center justify-center"><div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" /></div>}>
+      <ExploreContent />
+    </Suspense>
   );
 }

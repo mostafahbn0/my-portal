@@ -1,60 +1,79 @@
-"use client";
-import React from 'react';
 import Link from 'next/link';
-import { Play, Star } from 'lucide-react';
+import { Star, Play } from 'lucide-react';
 import { getMediaPoster, getMediaYear, getMediaRating } from '@/lib/utils';
 
-export default function MovieCard({ movie }: { movie: any }) {
-  const posterUrl = getMediaPoster(movie);
-  const year = getMediaYear(movie);
-  const rating = getMediaRating(movie);
+export default function MovieCard({ item }: { item: any }) {
+  const poster = getMediaPoster(item);
+  const year = getMediaYear(item);
+  const rating = getMediaRating(item);
+
+  // إظهار الاسم الأصلي/الحقيقي أولاً ثم الاسم المعرب
+  const realTitle = item.original_title || item.title || 'بدون عنوان';
+  const arabicTitle = item.title && item.title !== item.original_title ? item.title : null;
 
   return (
     <Link 
-      href={`/watch/${movie.id}`} 
-      className="group relative block rounded-xl overflow-hidden bg-[#101014] border border-white/5 hover:border-red-600/40 transition-all duration-300 shadow-md hover:-translate-y-1"
+      href={`/watch/${item.id}`} 
+      className="group relative flex flex-col bg-[#121318] rounded-xl overflow-hidden border border-white/5 hover:border-red-600/50 transition-all duration-300 hover:shadow-xl hover:shadow-red-600/10 hover:-translate-y-1.5"
     >
-      <div className="poster-box">
-        <img
-          src={posterUrl}
-          alt={movie.title || 'عمل سينمائي'}
+      {/* حاوية البوستر بالنسبة الثابتة */}
+      <div className="relative w-full aspect-[2/3] bg-[#1a1c23] overflow-hidden">
+        <img 
+          src={poster} 
+          alt={realTitle}
+          className="poster-box group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
-          onError={(e) => {
-            e.currentTarget.src = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop&q=60";
-          }}
-          className="transition-transform duration-500 group-hover:scale-105"
         />
-        
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-80" />
-        
-        {/* التقييم والشارة */}
-        <div className="absolute top-2 right-2 flex flex-col gap-1 items-end z-10">
-          <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded shadow">HD</span>
-          {Number(rating) > 0 && (
-            <span className="bg-black/80 backdrop-blur-md text-yellow-500 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 border border-white/10">
-              <Star size={11} fill="currentColor" /> {rating}
-            </span>
-          )}
+
+        {/* تدرج لوني خفيف فوق الصورة */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#121318] via-transparent to-black/30 opacity-80 group-hover:opacity-60 transition-opacity" />
+
+        {/* بادج التقييم */}
+        {Number(rating) > 0 && (
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 text-xs font-bold text-yellow-400">
+            <Star className="w-3 h-3 fill-yellow-400" />
+            <span>{rating}</span>
+          </div>
+        )}
+
+        {/* بادج الجودة */}
+        <div className="absolute top-2.5 left-2.5 bg-red-600/90 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
+          WEB-DL
         </div>
 
         {/* زر تشغيل عند الـ Hover */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-10">
-          <div className="bg-red-600 text-white p-3 rounded-full shadow-2xl transform scale-75 group-hover:scale-100 transition-transform">
-            <Play size={20} fill="currentColor" />
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300">
+          <div className="w-12 h-12 rounded-full bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-600/50 scale-75 group-hover:scale-100 transition-transform">
+            <Play className="w-5 h-5 fill-white ml-0.5" />
           </div>
         </div>
+
+        {/* بادج السنة في أسفل البوستر */}
+        {year && (
+          <div className="absolute bottom-2 left-2 text-[11px] font-semibold text-gray-300 bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded">
+            {year}
+          </div>
+        )}
       </div>
-      
-      <div className="p-2.5 bg-[#101014]">
-        <h3 className="text-xs font-bold text-white truncate group-hover:text-red-500 transition-colors">
-          {movie.title || movie.name}
+
+      {/* تفاصيل العنوان أسفل البوستر */}
+      <div className="p-3 flex flex-col justify-between flex-1 gap-1">
+        {/* الاسم الحقيقي الإنجليزي */}
+        <h3 
+          className="text-white font-bold text-sm line-clamp-1 group-hover:text-red-500 transition-colors" 
+          dir="ltr"
+          style={{ textAlign: 'right' }}
+          title={realTitle}
+        >
+          {realTitle}
         </h3>
-        <div className="flex justify-between items-center mt-1 text-[11px] text-gray-400">
-          <span>{year}</span>
-          <span className="text-red-500/80 font-medium">
-            {movie.type === 'movie' ? 'فيلم' : movie.type === 'anime' ? 'أنمي' : 'مسلسل'}
-          </span>
-        </div>
+
+        {/* الاسم العربي الفرعي لو متوفر ومختلف */}
+        {arabicTitle && (
+          <p className="text-gray-400 text-xs line-clamp-1" title={arabicTitle}>
+            {arabicTitle}
+          </p>
+        )}
       </div>
     </Link>
   );
