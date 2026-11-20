@@ -10,7 +10,7 @@ const cairo = Cairo({
 
 export const metadata: Metadata = {
   title: "سينما بلاس | مشاهدة أحدث الأفلام والمسلسلات مترجمة",
-  description: "المنصة الأولى لمشاهدة وتحميل الأفلام والمسلسلات العربية والأجنبية والأنمي بأعلى جودة 4K مترجمة للعربية.",
+  description: "المنصة العربية الأولى لمشاهدة وتحميل الأفلام والمسلسلات العربية والأجنبية والأنمي بجودة 4K فائقة وترجمة معتمدة.",
 };
 
 export default function RootLayout({
@@ -24,7 +24,7 @@ export default function RootLayout({
         <meta name="monetag" content="3e81a1f47455d827e8622e53ef6a6ed9" />
         <meta name="referrer" content="no-referrer" />
         
-        {/* إعلانات الكواليس والـ Vignette والأرباح بدون أي رسائل جانبية مشوهة */}
+        {/* إعلانات الأرباح النظيفة فقط (Vignette + MultiTag الأساسي) - بدون أي رسائل جانبية مشوهة */}
         <script src="https://quge5.com/88/tag.min.js" data-zone="313132" async data-cfasync="false"></script>
         <script src="https://5gvci.com/act/files/tag.min.js?z=12311722" data-cfasync="false" async></script>
         

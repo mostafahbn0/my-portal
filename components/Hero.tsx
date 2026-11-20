@@ -1,80 +1,135 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Play, Info, Star } from 'lucide-react';
+import { Play, Info, Star, Calendar, Clapperboard, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { getMediaBackdrop, getMediaYear, getMediaRating } from '@/lib/utils';
 
-export default function Hero({ item }: { item?: any }) {
-  if (!item || !item.id) {
+export default function Hero({ items = [] }: { items?: any[] }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [showTrailer, setShowTrailer] = useState(false);
+
+  const heroList = Array.isArray(items) && items.length > 0 ? items.slice(0, 5) : [];
+
+  // تقليب تلقائي كل 6 ثوانٍ
+  useEffect(() => {
+    if (heroList.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % heroList.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [heroList.length]);
+
+  if (heroList.length === 0) {
     return (
-      <div className="relative w-full h-[55vh] md:h-[70vh] bg-[#0c0d12] flex items-center justify-center border-b border-white/5">
+      <div className="relative w-full h-[60vh] bg-[#0c0d12] flex items-center justify-center border-b border-white/5">
         <div className="text-center space-y-2">
-          <h1 className="text-2xl md:text-4xl font-black text-white">سينما بلاس</h1>
-          <p className="text-gray-400 text-sm">أقوى الأفلام والمسلسلات الحصرية بأعلى دقة</p>
+          <h1 className="text-3xl md:text-5xl font-black text-white">سينما بلاس VIP</h1>
+          <p className="text-gray-400 text-sm">أضخم مكتبة سينمائية عربية وأجنبية بجودة 4K</p>
         </div>
       </div>
     );
   }
 
-  const backdrop = getMediaBackdrop(item);
-  const realTitle = item.original_title || item.title || 'عمل مميز';
-  const arabicTitle = item.title && item.title !== realTitle ? item.title : null;
-  const year = getMediaYear(item);
-  const rating = getMediaRating(item);
+  const currentItem = heroList[currentIndex] || heroList[0];
+  const backdrop = getMediaBackdrop(currentItem);
+  const realTitle = currentItem.title || 'عمل سينمائي مميز';
+  const year = getMediaYear(currentItem);
+  const rating = getMediaRating(currentItem);
 
   return (
-    <div className="relative w-full h-[60vh] md:h-[75vh] bg-[#08080a] overflow-hidden">
-      <img
-        src={backdrop}
-        alt={realTitle}
-        className="w-full h-full object-cover object-center filter brightness-60"
+    <div className="relative w-full h-[70vh] md:h-[82vh] bg-[#08080a] overflow-hidden group">
+      
+      {/* خلفية البوستر مع تلاشي متحرك */}
+      <div 
+        key={currentItem.id}
+        className="absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-out filter brightness-60 scale-105 group-hover:scale-100"
+        style={{ backgroundImage: `url(${backdrop})` }}
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#08080a] via-[#08080a]/50 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#08080a] via-transparent to-transparent" />
 
-      <div className="absolute bottom-12 right-0 left-0 max-w-7xl mx-auto px-4 sm:px-6 space-y-4">
-        <div className="flex items-center gap-3 text-xs md:text-sm text-gray-300">
+      {/* التدرجات اللونية الفخمة لمنع تشويه النص */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#08080a] via-[#08080a]/60 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#08080a] via-[#08080a]/40 to-transparent" />
+      <div className="absolute inset-0 bg-radial-gradient from-transparent via-transparent to-black/60 pointer-events-none" />
+
+      {/* المحتوى النصي داخل البانر */}
+      <div className="absolute bottom-16 right-0 left-0 max-w-7xl mx-auto px-4 sm:px-6 space-y-5 z-20">
+        
+        {/* البادجات */}
+        <div className="flex flex-wrap items-center gap-3 text-xs md:text-sm text-gray-300">
+          <span className="bg-red-600 text-white font-black px-3 py-1 rounded-full text-[11px] tracking-wide uppercase shadow-lg shadow-red-600/40">
+            🔥 متصدر المشاهدات الآن
+          </span>
+
           {Number(rating) > 0 && (
-            <div className="flex items-center gap-1 bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded font-bold border border-yellow-500/30">
+            <div className="flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full font-bold border border-yellow-500/30 text-yellow-400">
               <Star className="w-3.5 h-3.5 fill-yellow-400" />
-              <span>{rating}</span>
+              <span>{rating} / 10</span>
             </div>
           )}
-          {year && <span className="bg-white/10 px-2 py-0.5 rounded">{year}</span>}
-          <span className="bg-red-600/80 text-white px-2 py-0.5 rounded font-bold">حصرياً</span>
+
+          {year && (
+            <span className="bg-white/10 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 text-gray-200 font-semibold">
+              {year}
+            </span>
+          )}
+
+          <span className="bg-white/5 backdrop-blur-md px-3 py-1 rounded-full border border-white/5 text-emerald-400 font-bold">
+            Ultra HD 4K
+          </span>
         </div>
 
-        <div>
-          <h1 className="text-3xl md:text-6xl font-black text-white max-w-2xl leading-tight" dir="ltr" style={{ textAlign: 'right' }}>
+        {/* العنوان الرئيسي */}
+        <div className="max-w-3xl space-y-2">
+          <h1 
+            className="text-4xl sm:text-6xl md:text-7xl font-black text-white leading-tight drop-shadow-2xl" 
+            dir="ltr"
+            style={{ textAlign: 'right' }}
+          >
             {realTitle}
           </h1>
-          {arabicTitle && (
-            <p className="text-xl md:text-2xl text-red-500 font-bold mt-1">
-              {arabicTitle}
-            </p>
-          )}
         </div>
 
-        <p className="text-gray-300 text-xs md:text-sm max-w-xl line-clamp-2 md:line-clamp-3">
-          {item.overview || 'مشاهدة وتحميل بأعلى دقة متوفرة مع سيرفرات سريعة حصرياً على سينما بلاس.'}
+        {/* ملخص العمل */}
+        <p className="text-gray-300 text-sm md:text-base max-w-2xl line-clamp-2 md:line-clamp-3 leading-relaxed drop-shadow-md">
+          {currentItem.overview || 'مشاهدة وتحميل بأعلى دقة متوفرة مع سيرفرات متعددة سريعة وترجمة عربية معتمدة على سينما بلاس.'}
         </p>
 
-        <div className="flex items-center gap-3 pt-2">
+        {/* الأزرار التفاعلية */}
+        <div className="flex flex-wrap items-center gap-4 pt-2">
           <Link
-            href={`/watch/${item.id}`}
-            className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-3 rounded-xl transition-all shadow-lg shadow-red-600/30 hover:scale-105"
+            href={`/watch/${currentItem.id}`}
+            className="flex items-center gap-2.5 bg-red-600 hover:bg-red-700 text-white font-black px-8 py-3.5 rounded-2xl transition-all shadow-xl shadow-red-600/40 hover:scale-105 active:scale-95 text-sm md:text-base"
           >
             <Play className="w-5 h-5 fill-white" />
-            <span>مشاهدة الآن</span>
+            <span>مشاهدة العمل</span>
           </Link>
 
           <Link
-            href={`/watch/${item.id}`}
-            className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white font-bold px-5 py-3 rounded-xl border border-white/10 transition-all"
+            href={`/watch/${currentItem.id}`}
+            className="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-md text-white font-bold px-6 py-3.5 rounded-2xl border border-white/15 transition-all text-sm md:text-base"
           >
             <Info className="w-5 h-5" />
-            <span>التفاصيل</span>
+            <span>تفاصيل السيرفرات</span>
           </Link>
         </div>
       </div>
+
+      {/* مؤشرات التقليب (Dots) وأزرار الأسهم */}
+      {heroList.length > 1 && (
+        <div className="absolute bottom-6 left-6 z-20 flex items-center gap-2">
+          {heroList.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentIndex(idx)}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                currentIndex === idx ? 'w-8 bg-red-600' : 'w-2 bg-white/30 hover:bg-white/60'
+              }`}
+              title={`انتقل للشريحة ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
