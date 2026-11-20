@@ -1,8 +1,19 @@
-import { NextResponse } from 'next/server';
-import { fetchFromTMDB } from '@/lib/tmdb';
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const type = (new URL(req.url).searchParams.get('type') || 'movie') as 'movie' | 'tv';
-  if (req.headers.get('x-admin-secret') !== process.env.ADMIN_SECRET) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  try { return NextResponse.json(await fetchFromTMDB(parseInt(params.id), type)); }
-  catch (e: any) { return NextResponse.json({ error: e.message }, { status: 500 }); }
+import { NextResponse } from 'next/server'
+
+export const dynamic = 'force-dynamic'
+
+export async function GET(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const resolvedParams = await params
+    const id = resolvedParams.id
+    const apiKey = process.env.TMDB_API_KEY
+    const res = await fetch(`https://api.themoviedb.org/3/movie/${id}?api_key=${apiKey}&language=ar-SA`)
+    const data = await res.json()
+    return NextResponse.json(data)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 }

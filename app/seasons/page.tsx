@@ -1,51 +1,44 @@
-import { supabaseServer } from '@/lib/supabase/server';
-import MediaCard from '@/components/MediaCard';
-import AdSlot from '@/components/AdSlot';
-import { Layers } from 'lucide-react';
-import type { Media } from '@/lib/types';
-import type { Metadata } from 'next';
+import { supabaseServer } from '@/lib/supabase/server'
+import Link from 'next/link'
+import Image from 'next/image'
+import { Film } from 'lucide-react'
 
-export const revalidate = 300;
-export const metadata: Metadata = { title: 'مواسم كاملة' };
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 export default async function SeasonsPage() {
-  const { data } = await supabaseServer
+  const supabase = supabaseServer()
+  const { data: media } = await supabase
     .from('media')
     .select('*')
     .in('type', ['series', 'anime'])
-    .eq('status', 'completed')
     .order('created_at', { ascending: false })
-    .limit(60);
-
-  const items = (data as Media[]) || [];
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-8">
-        <div className="p-3 bg-green-600/20 rounded-xl">
-          <Layers className="w-7 h-7 text-green-400" />
-        </div>
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold">📦 مواسم كاملة</h1>
-          <p className="text-slate-400 text-sm mt-1">مسلسلات وأنمي مكتملة جاهزة للتحميل</p>
-        </div>
+    <div className="container mx-auto px-4 max-w-7xl py-10 space-y-6">
+      <h1 className="text-2xl md:text-3xl font-black text-white">المسلسلات والأنمي</h1>
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {media?.map((item) => (
+          <Link
+            key={item.id}
+            href={`/media/${item.slug}`}
+            className="group bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden hover:border-rose-500/50 transition-all"
+          >
+            <div className="relative aspect-[2/3] w-full bg-slate-950">
+              {item.poster_url ? (
+                <Image src={item.poster_url} alt={item.title} fill className="object-cover group-hover:scale-105 transition-transform" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-700">
+                  <Film className="w-8 h-8" />
+                </div>
+              )}
+            </div>
+            <div className="p-3">
+              <h3 className="font-bold text-xs text-white truncate">{item.title_ar || item.title}</h3>
+            </div>
+          </Link>
+        ))}
       </div>
-
-      <AdSlot height={100} id="ad-seasons-top" />
-
-      {items.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {items.map((m) => (
-            <MediaCard key={m.id} media={m} />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-20">
-          <p className="text-slate-400 text-xl">لا توجد مواسم مكتملة حالياً</p>
-        </div>
-      )}
-
-      <AdSlot height={100} id="ad-seasons-bottom" />
     </div>
-  );
+  )
 }
