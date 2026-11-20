@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import MovieCard from '@/components/MovieCard';
 import AdBanner from '@/components/AdBanner';
-import { Search, Filter, Film, Tv, Flame } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 function ExploreContent() {
   const searchParams = useSearchParams();
@@ -24,13 +24,11 @@ function ExploreContent() {
       try {
         let query = supabase.from('media').select('*');
 
-        // بحث مزدوج فوري (عربي + إنجليزي)
         if (searchTerm.trim()) {
           const q = searchTerm.trim();
-          query = query.or(`title.ilike.%${q}%,original_title.ilike.%${q}%`);
+          query = query.or(`title.ilike.%${q}%,overview.ilike.%${q}%`);
         }
 
-        // فلترة بالنوع
         if (selectedType === 'movies') {
           query = query.eq('media_type', 'movie');
         } else if (selectedType === 'series') {
@@ -39,8 +37,8 @@ function ExploreContent() {
 
         query = query.order('id', { ascending: false }).limit(60);
 
-        const { data, error } = await query;
-        if (!error && data) {
+        const { data } = await query;
+        if (data) {
           setItems(data);
         }
       } catch (err) {
@@ -50,7 +48,7 @@ function ExploreContent() {
       }
     }
 
-    const timer = setTimeout(fetchData, 300);
+    const timer = setTimeout(fetchData, 250);
     return () => clearTimeout(timer);
   }, [searchTerm, selectedType]);
 
@@ -59,27 +57,24 @@ function ExploreContent() {
       <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* عنوان الصفحة وشريط البحث */}
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between mb-8">
           <div>
             <h1 className="text-2xl md:text-3xl font-black text-white">مكتبة الأعمال السينمائية</h1>
-            <p className="text-sm text-gray-400 mt-1">ابحث وتصفح أحدث الأفلام والمسلسلات المترجمة بأعلى دقة</p>
+            <p className="text-sm text-gray-400 mt-1">ابحث وتصفح أحدث الأفلام والمسلسلات بأعلى دقة</p>
           </div>
 
           <div className="flex items-center gap-3 w-full md:w-auto">
-            {/* حقل البحث داخل الصفحة */}
             <div className="relative flex-1 md:w-80">
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="ابحث بالاسم الحقيقي أو العربي..."
+                placeholder="ابحث بالاسم الحقيقي..."
                 className="w-full bg-[#121318] text-sm text-white rounded-xl pl-4 pr-10 py-2.5 border border-white/10 focus:border-red-600 focus:outline-none"
               />
               <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
 
-            {/* أزرار الفلترة */}
             <div className="flex items-center gap-1.5 bg-[#121318] p-1 rounded-xl border border-white/10 text-xs font-bold">
               <button
                 onClick={() => setSelectedType('all')}
@@ -103,7 +98,6 @@ function ExploreContent() {
           </div>
         </div>
 
-        {/* عرض النتائج */}
         {loading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 animate-pulse">
             {[...Array(12)].map((_, i) => (

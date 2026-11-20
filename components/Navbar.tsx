@@ -19,7 +19,7 @@ export default function Navbar() {
   const [reqSent, setReqSent] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // إغلاق نافذة البحث عند النقر خارجها
+  // إغلاق قائمة البحث عند النقر في أي مكان خارجها
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
@@ -30,23 +30,35 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // بحث فوري ثنائي اللغة (عربي + إنجليزي)
+  // بحث فوري شغال 100% عربي + إنجليزي
   useEffect(() => {
     const timer = setTimeout(async () => {
       const q = searchQuery.trim();
-      if (q.length >= 2) {
+      if (q.length >= 1) {
         setLoading(true);
         try {
-          const { data } = await supabase
+          // البحث الآمن في حقل title وحقل overview
+          const { data, error } = await supabase
             .from('media')
             .select('*')
-            .or(`title.ilike.%${q}%,original_title.ilike.%${q}%`)
-            .limit(7);
+            .or(`title.ilike.%${q}%,overview.ilike.%${q}%`)
+            .limit(8);
 
-          setResults(data || []);
-          setIsOpen(true);
+          if (!error && data) {
+            setResults(data);
+            setIsOpen(true);
+          } else {
+            // محاولة بديلة فقط في العنوان
+            const fallback = await supabase
+              .from('media')
+              .select('*')
+              .ilike('title', `%${q}%`)
+              .limit(8);
+            setResults(fallback.data || []);
+            setIsOpen(true);
+          }
         } catch (err) {
-          console.error(err);
+          console.error('Search error:', err);
         } finally {
           setLoading(false);
         }
@@ -54,12 +66,11 @@ export default function Navbar() {
         setResults([]);
         setIsOpen(false);
       }
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // الضغط على Enter
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && searchQuery.trim()) {
       setIsOpen(false);
@@ -67,16 +78,14 @@ export default function Navbar() {
     }
   };
 
-  // فشار الحظ (فيلم عشوائي)
   const handleRandomMovie = async () => {
-    const { data } = await supabase.from('media').select('id').limit(50);
+    const { data } = await supabase.from('media').select('id').limit(40);
     if (data && data.length > 0) {
       const randomItem = data[Math.floor(Math.random() * data.length)];
       router.push(`/watch/${randomItem.id}`);
     }
   };
 
-  // إرسال طلب ميديا
   const handleSendRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!reqTitle.trim()) return;
@@ -99,7 +108,6 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 bg-[#08080a]/95 backdrop-blur-md border-b border-white/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         
-        {/* اللوجو والروابط */}
         <div className="flex items-center gap-6">
           <Link href="/" className="flex items-center gap-2">
             <span className="text-2xl font-black bg-gradient-to-r from-red-600 via-red-500 to-amber-500 bg-clip-text text-transparent">
@@ -112,22 +120,18 @@ export default function Navbar() {
               <Flame className="w-4 h-4 text-red-500" />
               الرئيسية
             </Link>
-            <Link href="/explore?cat=أفلام أجنبية" className="hover:text-red-500 transition-colors flex items-center gap-1.5">
+            <Link href="/explore?cat=movies" className="hover:text-red-500 transition-colors flex items-center gap-1.5">
               <Film className="w-4 h-4 text-gray-400" />
-              أفلام أجنبية
+              أفلام
             </Link>
-            <Link href="/explore?cat=أفلام عربية" className="hover:text-red-500 transition-colors flex items-center gap-1.5">
-              <Film className="w-4 h-4 text-amber-500" />
-              أفلام عربية
-            </Link>
-            <Link href="/explore?cat=مسلسلات" className="hover:text-red-500 transition-colors flex items-center gap-1.5">
+            <Link href="/explore?cat=series" className="hover:text-red-500 transition-colors flex items-center gap-1.5">
               <Tv className="w-4 h-4 text-blue-500" />
               مسلسلات
             </Link>
           </nav>
         </div>
 
-        {/* شريط البحث المطور */}
+        {/* شريط البحث */}
         <div ref={searchRef} className="relative flex-1 max-w-md">
           <div className="relative">
             <input
@@ -135,7 +139,7 @@ export default function Navbar() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="ابحث بالاسم الحقيقي أو العربي (Deadpool, كثيب...)"
+              placeholder="ابحث عن فيلم أو مسلسل (Deadpool, Dune, ولاد رزق)..."
               className="w-full bg-[#121318] text-white text-sm rounded-full pl-10 pr-10 py-2 border border-white/10 focus:border-red-600 focus:outline-none transition-all placeholder:text-gray-500"
             />
             <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -153,13 +157,11 @@ export default function Navbar() {
           {isOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-[#121318] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50 max-h-96 overflow-y-auto">
               {loading ? (
-                <div className="p-4 text-center text-sm text-gray-400">جاري البحث في الأرشيف...</div>
+                <div className="p-4 text-center text-sm text-gray-400">جاري البحث...</div>
               ) : results.length > 0 ? (
                 <div className="divide-y divide-white/5">
                   {results.map((item) => {
                     const poster = getMediaPoster(item);
-                    const realTitle = item.original_title || item.title;
-                    const arabicTitle = item.title !== realTitle ? item.title : null;
                     const year = getMediaYear(item);
                     const rating = getMediaRating(item);
 
@@ -172,16 +174,13 @@ export default function Navbar() {
                       >
                         <img 
                           src={poster} 
-                          alt={realTitle} 
+                          alt={item.title} 
                           className="w-10 h-14 object-cover rounded-md bg-[#1a1c23] flex-shrink-0"
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-bold text-white group-hover:text-red-500 truncate" dir="ltr" style={{ textAlign: 'right' }}>
-                            {realTitle}
+                            {item.title}
                           </p>
-                          {arabicTitle && (
-                            <p className="text-xs text-gray-400 truncate">{arabicTitle}</p>
-                          )}
                           <div className="flex items-center gap-3 mt-1 text-[11px] text-gray-400">
                             {year && <span>{year}</span>}
                             {Number(rating) > 0 && (
@@ -205,19 +204,17 @@ export default function Navbar() {
           )}
         </div>
 
-        {/* الأزرار الإضافية */}
+        {/* أزرار الإجراءات */}
         <div className="flex items-center gap-2">
-          {/* فشار الحظ */}
           <button
             onClick={handleRandomMovie}
-            title="فشار الحظ (فيلم عشوائي)"
-            className="flex items-center gap-1.5 bg-white/5 hover:bg-red-600/20 text-gray-300 hover:text-red-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-white/5 hover:border-red-600/30 transition-all"
+            title="فشار الحظ"
+            className="flex items-center gap-1.5 bg-white/5 hover:bg-red-600/20 text-gray-300 hover:text-red-400 px-3 py-1.5 rounded-full text-xs font-semibold border border-white/5 transition-all"
           >
             <Shuffle className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">فشار الحظ</span>
           </button>
 
-          {/* اطلب فيلم */}
           <button
             onClick={() => setShowRequestModal(true)}
             className="flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md shadow-red-600/20"
@@ -228,7 +225,7 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* مودال طلب فيلم أو مسلسل */}
+      {/* مودال الطلبات */}
       {showRequestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-[#121318] border border-white/10 rounded-2xl max-w-sm w-full p-5 relative">
@@ -244,22 +241,21 @@ export default function Navbar() {
 
             {reqSent ? (
               <div className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 p-3 rounded-xl text-center text-sm font-bold">
-                تم استلام طلبك بنجاح! سيتم توفيره قريباً.
+                تم استلام طلبك بنجاح!
               </div>
             ) : (
               <form onSubmit={handleSendRequest} className="space-y-3">
                 <div>
-                  <label className="text-xs text-gray-300 mb-1 block">اسم الفيلم أو المسلسل</label>
+                  <label className="text-xs text-gray-300 mb-1 block">اسم العمل</label>
                   <input
                     type="text"
                     required
                     value={reqTitle}
                     onChange={(e) => setReqTitle(e.target.value)}
-                    placeholder="مثال: Dune 2 أو الحشاشين..."
+                    placeholder="مثال: Dune 2..."
                     className="w-full bg-[#181a20] text-white text-sm rounded-lg px-3 py-2 border border-white/10 focus:border-red-600 focus:outline-none"
                   />
                 </div>
-
                 <div>
                   <label className="text-xs text-gray-300 mb-1 block">النوع</label>
                   <select
@@ -269,15 +265,13 @@ export default function Navbar() {
                   >
                     <option value="movie">فيلم</option>
                     <option value="series">مسلسل</option>
-                    <option value="anime">أنمي</option>
                   </select>
                 </div>
-
                 <button
                   type="submit"
                   className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2 rounded-lg text-sm transition-all"
                 >
-                  إرسال الطلب الآن
+                  إرسال الطلب
                 </button>
               </form>
             )}
