@@ -1,98 +1,75 @@
-import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import Top10Slider from '@/components/Top10Slider';
 import MovieSlider from '@/components/MovieSlider';
 import AdBanner from '@/components/AdBanner';
-import { Film, Tv, Sparkles, Compass, ChevronLeft, ShieldAlert } from 'lucide-react';
 
-export default function Home() {
-  const quickGenres = [
-    { label: 'أكشن ومغامرات', icon: '🔥', href: '/explore?genre=أكشن' },
-    { label: 'أحدث المسلسلات', icon: '📺', href: '/explore?type=series' },
-    { label: 'أفلام رعب وإثارة', icon: '👻', href: '/explore?genre=رعب' },
-    { label: 'أنمي مترجم', icon: '⚡', href: '/explore?type=anime' },
-    { label: 'كوميديا وعائلي', icon: '🍿', href: '/explore?genre=كوميدي' },
-    { label: 'أفلام خيال علمي', icon: '🚀', href: '/explore?genre=خيال علمي' }
-  ];
+export const revalidate = 60; // تحديث تلقائي كل 60 ثانية
+
+export default async function HomePage() {
+  let mediaList: any[] = [];
+
+  try {
+    const { data, error } = await supabase
+      .from('media')
+      .select('*')
+      .order('id', { ascending: false })
+      .limit(60);
+
+    if (!error && data && Array.isArray(data)) {
+      mediaList = data.filter((item) => item && item.id);
+    }
+  } catch (err) {
+    console.error('Error fetching data:', err);
+  }
+
+  // توزيع الميديا بشكل آمن
+  const heroItem = mediaList.length > 0 ? mediaList[0] : null;
+  const top10 = mediaList.slice(0, 10);
+  
+  // تصنيف الأفلام والمسلسلات
+  const movies = mediaList.filter((m) => m.media_type === 'movie' || !m.media_type);
+  const series = mediaList.filter((m) => m.media_type === 'series' || m.media_type === 'tv');
 
   return (
-    <main className="min-h-screen bg-[#08080a] text-white" dir="rtl">
+    <div className="min-h-screen bg-[#08080a] text-white">
       <Navbar />
-      
-      {/* هيرو رئيسي ديناميكي */}
-      <Hero />
 
-      {/* شريط الأقسام السريعة الحماسي */}
-      <div className="container mx-auto px-4 -mt-6 relative z-20">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          {quickGenres.map((item) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className="bg-[#121216]/90 backdrop-blur-md border border-white/10 hover:border-red-600/50 p-3 rounded-xl flex items-center justify-between text-xs font-bold transition-all hover:-translate-y-1 shadow-lg group"
-            >
-              <div className="flex items-center gap-2">
-                <span>{item.icon}</span>
-                <span className="text-gray-200 group-hover:text-red-500 transition">{item.label}</span>
-              </div>
-              <ChevronLeft size={14} className="text-gray-500 group-hover:text-white group-hover:-translate-x-1 transition" />
-            </Link>
-          ))}
+      <main>
+        {/* البانر البطولي */}
+        <Hero item={heroItem} />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* بانر إعلاني علوي */}
+          <div className="my-6">
+            <AdBanner slot="home-top" />
+          </div>
+
+          {/* توب 10 */}
+          {top10.length > 0 && <Top10Slider items={top10} />}
+
+          {/* أحدث الإضافات */}
+          {mediaList.length > 0 && (
+            <MovieSlider title="أحدث الأعمال المضافة 🍿" items={mediaList.slice(0, 12)} />
+          )}
+
+          {/* الأفلام المتصدرة */}
+          {movies.length > 0 && (
+            <MovieSlider title="أقوى الأفلام العالمية المترجمة 🎬" items={movies.slice(0, 12)} />
+          )}
+
+          {/* المسلسلات */}
+          {series.length > 0 && (
+            <MovieSlider title="أحدث المسلسلات والأنمي 📺" items={series.slice(0, 12)} />
+          )}
+
+          {/* بانر إعلاني سفلي */}
+          <div className="my-10">
+            <AdBanner slot="home-bottom" />
+          </div>
         </div>
-      </div>
-
-      <AdBanner type="top" />
-
-      <div className="container mx-auto px-4 py-6 space-y-12">
-        
-        {/* صف الـ Top 10 المميز (زي نتفليكس) */}
-        <Top10Slider />
-
-        {/* أحدث الأفلام */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-black flex items-center gap-2 border-r-4 border-red-600 pr-3">
-              <Film size={20} className="text-red-600" /> أحدث الأفلام السينمائية
-            </h2>
-            <Link href="/explore?type=movie" className="text-xs text-red-500 hover:text-red-400 font-bold flex items-center gap-1">
-              عرض المزيد <ChevronLeft size={14} />
-            </Link>
-          </div>
-          <MovieSlider type="movie" />
-        </section>
-
-        <AdBanner type="inline" />
-
-        {/* أحدث المسلسلات */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-black flex items-center gap-2 border-r-4 border-red-600 pr-3">
-              <Tv size={20} className="text-red-600" /> أحدث المسلسلات التلفزيونية
-            </h2>
-            <Link href="/explore?type=series" className="text-xs text-red-500 hover:text-red-400 font-bold flex items-center gap-1">
-              عرض المزيد <ChevronLeft size={14} />
-            </Link>
-          </div>
-          <MovieSlider type="series" />
-        </section>
-
-        {/* عالم الأنمي */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg md:text-xl font-black flex items-center gap-2 border-r-4 border-red-600 pr-3">
-              <Sparkles size={20} className="text-red-600" /> عالم الأنمي المترجم
-            </h2>
-            <Link href="/explore?type=anime" className="text-xs text-red-500 hover:text-red-400 font-bold flex items-center gap-1">
-              عرض المزيد <ChevronLeft size={14} />
-            </Link>
-          </div>
-          <MovieSlider type="anime" />
-        </section>
-
-      </div>
-
-      <AdBanner type="sticky" />
-    </main>
+      </main>
+    </div>
   );
 }

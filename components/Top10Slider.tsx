@@ -1,77 +1,57 @@
-"use client";
-import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
 import { getMediaPoster, getMediaRating } from '@/lib/utils';
-import { Flame, Star } from 'lucide-react';
+import { Star } from 'lucide-react';
 
-export default function Top10Slider() {
-  const [topItems, setTopItems] = useState<any[]>([]);
+export default function Top10Slider({ items = [] }: { items: any[] }) {
+  if (!items || !Array.isArray(items) || items.length === 0) return null;
 
-  useEffect(() => {
-    async function loadTop10() {
-      const { data } = await supabase
-        .from('media')
-        .select('*')
-        .order('vote_average', { ascending: false })
-        .limit(10);
-
-      if (data && data.length > 0) {
-        setTopItems(data);
-      }
-    }
-    loadTop10();
-  }, []);
-
-  if (topItems.length === 0) return null;
+  const topItems = items.slice(0, 10);
 
   return (
-    <section className="my-8">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg md:text-xl font-black flex items-center gap-2 border-r-4 border-red-600 pr-3 text-white">
-          <Flame size={22} className="text-red-600" /> توب 10: الأكثر شعبية وتقييماً
-        </h2>
-      </div>
+    <section className="my-10">
+      <h2 className="text-xl md:text-2xl font-black text-white flex items-center gap-2 mb-4">
+        <span className="w-1.5 h-5 bg-red-600 rounded-full" />
+        <span>أفضل 10 أعمال اليوم 🔥</span>
+      </h2>
 
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none pt-2">
+      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-none scroll-smooth">
         {topItems.map((item, index) => {
-          const rank = index + 1;
+          if (!item || !item.id) return null;
           const poster = getMediaPoster(item);
+          const realTitle = item.original_title || item.title || 'عمل مميز';
           const rating = getMediaRating(item);
 
           return (
             <Link
               key={item.id}
               href={`/watch/${item.id}`}
-              className="group flex-shrink-0 relative flex items-end w-44 sm:w-48 transition-transform duration-300 hover:scale-105"
+              className="relative flex-shrink-0 w-36 sm:w-44 group"
             >
-              {/* الرقم العملاق على طريقة نتفليكس */}
-              <span className="text-7xl sm:text-8xl font-black tracking-tighter text-transparent select-none leading-none -ml-5 z-20 font-mono"
-                style={{
-                  WebkitTextStroke: '2px #dc2626',
-                  textShadow: '0 0 20px rgba(220, 38, 38, 0.4)'
-                }}
-              >
-                {rank}
-              </span>
-
-              {/* كارت البوستر */}
-              <div className="relative w-32 sm:w-36 aspect-[2/3] rounded-xl overflow-hidden shadow-2xl border border-white/10 bg-[#121216] z-10 flex-shrink-0">
+              <div className="relative aspect-[2/3] rounded-xl overflow-hidden bg-[#181a20] border border-white/5 group-hover:border-red-600/50 transition-all">
                 <img 
                   src={poster} 
-                  alt={item.title} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition duration-500" 
+                  alt={realTitle}
+                  className="poster-box group-hover:scale-105 transition-transform duration-300" 
+                  loading="lazy"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70" />
-                <div className="absolute top-1.5 right-1.5 bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] text-yellow-400 font-bold flex items-center gap-1 border border-white/10">
-                  <Star size={10} fill="currentColor" /> {rating}
-                </div>
-                <div className="absolute bottom-1.5 inset-x-1.5 text-right">
-                  <p className="text-[11px] font-bold text-white truncate group-hover:text-red-500 transition">
-                    {item.title}
-                  </p>
-                </div>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                
+                {Number(rating) > 0 && (
+                  <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/70 px-1.5 py-0.5 rounded text-[11px] font-bold text-yellow-400">
+                    <Star className="w-3 h-3 fill-yellow-400" />
+                    <span>{rating}</span>
+                  </div>
+                )}
               </div>
+
+              {/* رقم الترتيب النيتفلكسي العملاق */}
+              <span className="absolute -bottom-3 -right-2 text-6xl sm:text-7xl font-black text-black select-none pointer-events-none drop-shadow-[0_2px_4px_rgba(220,38,38,0.8)] font-sans">
+                {index + 1}
+              </span>
+
+              <p className="text-white text-xs font-bold mt-2 truncate group-hover:text-red-500 transition-colors" dir="ltr" style={{ textAlign: 'right' }}>
+                {realTitle}
+              </p>
             </Link>
           );
         })}
