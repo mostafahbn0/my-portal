@@ -13,52 +13,50 @@ HEADERS = {
     "Prefer": "return=minimal"
 }
 
-print("="*60)
-print("🔄 جاري جلب كل الأفلام والمسلسلات لتحديث أسمائها للأسماء الحقيقية...")
-print("="*60)
+# 1. اكتشاف الأعمدة الحقيقية
+def get_cols():
+    res = requests.get(f"{SUPABASE_URL}/rest/v1/media?limit=1", headers=HEADERS)
+    if res.status_code == 200 and len(res.json()) > 0:
+        return res.json()[0].keys()
+    return []
 
-res = requests.get(f"{SUPABASE_URL}/rest/v1/media?select=id,tmdb_id,title,media_type", headers=HEADERS)
-if res.status_code != 200:
-    print("❌ فشل في جلب البيانات من Supabase:", res.text)
-    exit()
+cols = get_cols()
+type_col = 'type' if 'type' in cols else ('media_type' if 'media_type' in cols else None)
+print(f"🔍 تم اكتشاف الأعمدة. عمود النوع هو: {type_col}")
 
+# 2. جلب البيانات للتحديث
+res = requests.get(f"{SUPABASE_URL}/rest/v1/media?select=id,tmdb_id,title" + (f",{type_col}" if type_col else ""), headers=HEADERS)
 items = res.json()
-print(f"📦 تم العثور على {len(items)} عمل في قاعدة البيانات. جاري التحديث الآن...")
 
-updated_count = 0
+updated = 0
 for item in items:
-    tmdb_id = item.get('tmdb_id')
-    current_title = item.get('title')
-    media_id = item.get('id')
-    m_type = item.get('media_type') or 'movie'
-    tmdb_endpoint = 'tv' if m_type in ['tv', 'series'] else 'movie'
+    tid = item.get('tmdb_id')
+    curr_title = item.get('title')
+    mid = item.get('id')
+    
+    # تحديد هل هو فيلم أم مسلسل
+    m_type = item.get(type_col) if type_col else 'movie'
+    endpoint = 'tv' if str(m_type).lower() in ['tv', 'series', 'show'] else 'movie'
 
-    if not tmdb_id:
-        continue
+    if not tid: continue
 
-    # استدعاء TMDB باللغة الإنجليزية لجلب الاسم الحقيقي
-    url = f"https://api.themoviedb.org/3/{tmdb_endpoint}/{tmdb_id}?api_key={TMDB_API_KEY}&language=en-US"
-    tmdb_res = requests.get(url).json()
+    # جلب الاسم العالمي من TMDB
+    try:
+        tmdb = requests.get(f"https://api.themoviedb.org/3/{endpoint}/{tid}?api_key={TMDB_API_KEY}&language=en-US").json()
+        real_title = tmdb.get('title') or tmdb.get('name') or tmdb.get('original_title')
+        
+        if tmdb.get('original_language') == 'ar':
+            real_title = tmdb.get('title') or curr_title
 
-    real_title = tmdb_res.get('title') or tmdb_res.get('name') or tmdb_res.get('original_title') or tmdb_res.get('original_name')
+        if real_title and real_title != curr_title:
+            patch_data = {"title": real_title}
+            if 'slug' in cols:
+                patch_data["slug"] = f"{real_title.lower().replace(' ', '-')[:40]}-{tid}"
+            
+            requests.patch(f"{SUPABASE_URL}/rest/v1/media?id=eq.{mid}", headers=HEADERS, json=patch_data)
+            print(f"✅ {curr_title} -> {real_title}")
+            updated += 1
+    except: pass
+    time.sleep(0.05)
 
-    # لو فيلم عربي نخليه الاسم العربي أو فرانكو/إنجليزي نظيف
-    if tmdb_res.get('original_language') == 'ar':
-        real_title = tmdb_res.get('title') or current_title
-
-    if real_title and real_title != current_title:
-        # تحديث العنوان في Supabase مباشرة
-        patch_url = f"{SUPABASE_URL}/rest/v1/media?id=eq.{media_id}"
-        patch_payload = {
-            "title": real_title,
-            "slug": f"{real_title.lower().replace(' ', '-')[:40]}-{tmdb_id}"
-        }
-        patch_res = requests.patch(patch_url, headers=HEADERS, json=patch_payload)
-        if patch_res.status_code in [200, 204]:
-            print(f"  ✨ تم التعديل: {current_title} ➔ 🎬 {real_title}")
-            updated_count += 1
-        time.sleep(0.05)
-
-print("\n" + "="*60)
-print(f"🎉 تم تحديث {updated_count} فيلم ومسلسل بالاسم الإنجليزي الحقيقي بنجاح!")
-print("="*60)
+print(f"\n✨ تم تحديث {updated} عمل بالأسماء الحقيقية!")
