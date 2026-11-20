@@ -1,333 +1,567 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useParams } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { 
-  Play, Star, Calendar, Download, Server, ShieldCheck, 
-  Check, X, HardDrive, ArrowDownToLine, Sparkles, ExternalLink 
+  Play, 
+  Download, 
+  Star, 
+  Clock, 
+  Calendar, 
+  Share2, 
+  Tv, 
+  Film, 
+  CheckCircle2, 
+  ChevronDown, 
+  Sparkles, 
+  Layers,
+  ArrowRight
 } from 'lucide-react';
-import Navbar from '@/components/Navbar';
-import AdBanner from '@/components/AdBanner';
-import { getMediaPoster, getMediaBackdrop, getMediaYear, getMediaRating } from '@/lib/utils';
+import Link from 'next/link';
+
+interface Episode {
+  episode_number: number;
+  name: string;
+  overview: string;
+  still_path: string | null;
+}
+
+interface Season {
+  season_number: number;
+  name: string;
+  episode_count: number;
+}
 
 export default function WatchPage() {
-  const { id } = useParams();
-  const [media, setMedia] = useState<any>(null);
-  const [activeServer, setActiveServer] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [showAdOverlay, setShowAdOverlay] = useState(false);
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+
+  const [item, setItem] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeServer, setActiveServer] = useState<'vidlink' | 'embedsu' | 'autoembed'>('vidlink');
   
-  // حالات مودال التحميل
+  // TV Series States
+  const [isSeries, setIsSeries] = useState(false);
+  const [seasons, setSeasons] = useState<Season[]>([]);
+  const [selectedSeason, setSelectedSeason] = useState(1);
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [selectedEpisode, setSelectedEpisode] = useState(1);
+  const [loadingEpisodes, setLoadingEpisodes] = useState(false);
+
+  // Monetization & Download Modal
   const [showDownloadModal, setShowDownloadModal] = useState(false);
-  const [downloadStep, setDownloadStep] = useState<'select' | 'generating' | 'ready'>('select');
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const [downloadReady, setDownloadReady] = useState(false);
   const [selectedQuality, setSelectedQuality] = useState('1080p');
-  const [activeDownloadUrl, setActiveDownloadUrl] = useState('');
-  const [countdown, setCountdown] = useState(3);
+  const [hasTriggeredPreRoll, setHasTriggeredPreRoll] = useState(false);
 
-  const playerRef = useRef<HTMLDivElement>(null);
-  const monetagDirectLink = "https://uplcm.com/4/12311730";
+  const DIRECT_AD_LINK = 'https://uplcm.com/4/12311730';
+  const TMDB_KEY = '204ce203e280acdfec221ea09ea5e763';
 
+  // 1. Fetch Item Data from Supabase
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase.from('media').select('*').eq('id', id).single();
-      setMedia(data);
+    async function fetchMedia() {
+      if (!id) return;
+      setLoading(true);
+
+      const { data, error } = await supabase
+        .from('media')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        console.error('Error fetching media:', error);
+        setLoading(false);
+        return;
+      }
+
+      setItem(data);
+      const isTv = data.type === 'series' || data.type === 'tv' || data.media_type === 'series' || data.media_type === 'tv';
+      setIsSeries(isTv);
+
+      // If it's a TV series, fetch seasons from TMDB
+      if (isTv && data.tmdb_id) {
+        fetchSeriesDetails(data.tmdb_id);
+      }
+
+      setLoading(false);
     }
-    load();
+
+    fetchMedia();
   }, [id]);
 
-  if (!media) return <div className="min-h-screen bg-[#08080a]" />;
-
-  const tmdbId = media.tmdb_id;
-  const isMovie = !media.media_type || media.media_type === 'movie';
-  
-  // سيرفرات المشاهدة
-  const streamingServers = [
-    { name: 'سيرفر VIP 1 (مترجم تلقائي)', url: `https://vidlink.pro/${isMovie ? 'movie' : 'tv'}/${tmdbId}?sub.ar=true&primaryColor=dc2626` },
-    { name: 'سيرفر EmbedSU (ترجمة مدمجة)', url: `https://embed.su/embed/${isMovie ? 'movie' : 'tv'}/${tmdbId}` },
-    { name: 'سيرفر AutoEmbed الاحتياطي', url: `https://player.autoembed.cc/embed/${isMovie ? 'movie' : 'tv'}/${tmdbId}` },
-  ];
-
-  // روابط وسيرفرات التحميل الحقيقية الموزعة حسب الجودة
-  const downloadTiers = [
-    {
-      quality: '1080p FHD',
-      size: '2.4 GB',
-      resolution: '1920x1080',
-      tag: 'أعلى دقة',
-      servers: [
-        { name: 'سيرفر سينما بلاس الصاروخي (Direct CDN)', url: `https://dl.vidlink.pro/download/${isMovie ? 'movie' : 'tv'}/${tmdbId}?res=1080` },
-        { name: 'سيرفر Mega السحابي فائق السرعة', url: `https://player.autoembed.cc/download/${tmdbId}?quality=1080` },
-        { name: 'سيرفر GoFile المباشر', url: `https://embed.su/download/${tmdbId}` },
-      ]
-    },
-    {
-      quality: '720p HD',
-      size: '1.1 GB',
-      resolution: '1280x720',
-      tag: 'الأكثر طلباً',
-      servers: [
-        { name: 'سيرفر سينما بلاس السريع (Direct CDN)', url: `https://dl.vidlink.pro/download/${isMovie ? 'movie' : 'tv'}/${tmdbId}?res=720` },
-        { name: 'سيرفر MediaFire المباشر', url: `https://player.autoembed.cc/download/${tmdbId}?quality=720` },
-      ]
-    },
-    {
-      quality: '480p SD',
-      size: '520 MB',
-      resolution: '854x480',
-      tag: 'لباقات الموبايل',
-      servers: [
-        { name: 'سيرفر التوفير فائق السرعة (Mobile CDN)', url: `https://dl.vidlink.pro/download/${isMovie ? 'movie' : 'tv'}/${tmdbId}?res=480` },
-      ]
+  // 2. Fetch Seasons from TMDB
+  async function fetchSeriesDetails(tmdbId: number) {
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_KEY}&language=ar-SA`);
+      const tvData = await res.json();
+      
+      if (tvData.seasons && tvData.seasons.length > 0) {
+        // Filter out specials (season 0) if desired, or keep all
+        const validSeasons = tvData.seasons.filter((s: any) => s.season_number > 0);
+        setSeasons(validSeasons.length > 0 ? validSeasons : tvData.seasons);
+        const initialSeason = validSeasons.length > 0 ? validSeasons[0].season_number : 1;
+        setSelectedSeason(initialSeason);
+        fetchSeasonEpisodes(tmdbId, initialSeason);
+      }
+    } catch (err) {
+      console.error('Error fetching seasons:', err);
     }
-  ];
+  }
 
-  // إجراء الضغط على المشاهدة
-  const handlePlayAction = () => {
-    window.open(monetagDirectLink, '_blank');
-    setShowAdOverlay(true);
-    setTimeout(() => {
-      playerRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
+  // 3. Fetch Episodes for Selected Season
+  async function fetchSeasonEpisodes(tmdbId: number, seasonNum: number) {
+    setLoadingEpisodes(true);
+    try {
+      const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNum}?api_key=${TMDB_KEY}&language=ar-SA`);
+      const seasonData = await res.json();
+      if (seasonData.episodes) {
+        setEpisodes(seasonData.episodes);
+        setSelectedEpisode(seasonData.episodes[0]?.episode_number || 1);
+      }
+    } catch (err) {
+      console.error('Error fetching episodes:', err);
+    } finally {
+      setLoadingEpisodes(false);
+    }
+  }
+
+  const handleSeasonChange = (seasonNum: number) => {
+    setSelectedSeason(seasonNum);
+    if (item?.tmdb_id) {
+      fetchSeasonEpisodes(item.tmdb_id, seasonNum);
+    }
   };
 
-  // إجراء الضغط على سيرفر تحميل معين
-  const handleDownloadServerClick = (targetUrl: string) => {
-    // 1. فتح الإعلان في نافذة جديدة (تحقيق الـ CPM)
-    window.open(monetagDirectLink, '_blank');
-    
-    // 2. تفعيل مرحلة تجهيز الرابط الحقيقي أمام الزائر في نفس الصفحة
-    setActiveDownloadUrl(targetUrl);
-    setDownloadStep('generating');
-    setCountdown(3);
+  // Video Embed URL Generator
+  const getEmbedUrl = () => {
+    if (!item?.tmdb_id) return '';
 
-    const interval = setInterval(() => {
+    if (isSeries) {
+      switch (activeServer) {
+        case 'vidlink':
+          return `https://vidlink.pro/tv/${item.tmdb_id}/${selectedSeason}/${selectedEpisode}?sub.ar=true&primaryColor=dc2626`;
+        case 'embedsu':
+          return `https://embed.su/embed/tv/${item.tmdb_id}/${selectedSeason}/${selectedEpisode}`;
+        case 'autoembed':
+          return `https://player.autoembed.cc/embed/tv/${item.tmdb_id}/${selectedSeason}/${selectedEpisode}`;
+        default:
+          return `https://vidlink.pro/tv/${item.tmdb_id}/${selectedSeason}/${selectedEpisode}?sub.ar=true&primaryColor=dc2626`;
+      }
+    } else {
+      switch (activeServer) {
+        case 'vidlink':
+          return `https://vidlink.pro/movie/${item.tmdb_id}?sub.ar=true&primaryColor=dc2626`;
+        case 'embedsu':
+          return `https://embed.su/embed/movie/${item.tmdb_id}`;
+        case 'autoembed':
+          return `https://player.autoembed.cc/embed/movie/${item.tmdb_id}`;
+        default:
+          return `https://vidlink.pro/movie/${item.tmdb_id}?sub.ar=true&primaryColor=dc2626`;
+      }
+    }
+  };
+
+  // 2-Click Play Monetization Pre-Roll
+  const handlePlayerOverlayClick = () => {
+    if (!hasTriggeredPreRoll) {
+      window.open(DIRECT_AD_LINK, '_blank');
+      setHasTriggeredPreRoll(true);
+    }
+  };
+
+  // Download Trigger
+  const handleStartDownload = () => {
+    window.open(DIRECT_AD_LINK, '_blank');
+    setCountdown(5);
+    setDownloadReady(false);
+
+    const timer = setInterval(() => {
       setCountdown((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          setDownloadStep('ready');
+        if (prev !== null && prev <= 1) {
+          clearInterval(timer);
+          setDownloadReady(true);
           return 0;
         }
-        return prev - 1;
+        return prev !== null ? prev - 1 : 0;
       });
     }, 1000);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#08080a] flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
+  if (!item) {
+    return (
+      <div className="min-h-screen bg-[#08080a] flex flex-col items-center justify-center text-white text-center p-6">
+        <h2 className="text-2xl font-bold mb-4">عذراً، العمل غير متوفر حالياً</h2>
+        <Link href="/" className="px-6 py-2.5 bg-red-600 rounded-xl font-bold hover:bg-red-700">
+          العودة للرئيسية
+        </Link>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-[#08080a] text-white">
-      <Navbar />
+    <div className="min-h-screen bg-[#08080a] text-white pb-20" dir="rtl">
+      
+      {/* Top Breadcrumb Header */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between border-b border-white/5">
+        <div className="flex items-center gap-2 text-sm text-gray-400">
+          <Link href="/" className="hover:text-white transition">الرئيسية</Link>
+          <span>/</span>
+          <Link href={isSeries ? '/series' : '/movies'} className="hover:text-white transition">
+            {isSeries ? 'مسلسلات' : 'أفلام'}
+          </Link>
+          <span>/</span>
+          <span className="text-red-500 font-bold truncate max-w-[200px] sm:max-w-md">
+            {item.title} {isSeries && `- موسم ${selectedSeason} حلقة ${selectedEpisode}`}
+          </span>
+        </div>
 
-      {/* خلفية البانر */}
-      <div className="relative h-[50vh] w-full">
-        <img src={getMediaBackdrop(media)} className="w-full h-full object-cover brightness-[0.2]" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#08080a] via-transparent" />
+        <button 
+          onClick={() => {
+            if (navigator.share) {
+              navigator.share({ title: item.title, url: window.location.href });
+            } else {
+              navigator.clipboard.writeText(window.location.href);
+              alert('تم نسخ الرابط بنجاح!');
+            }
+          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-semibold text-gray-300 transition"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+          <span>مشاركة</span>
+        </button>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 -mt-40 relative z-10 pb-20">
-        <div className="flex flex-col md:flex-row gap-10">
-          <div className="w-56 flex-shrink-0 mx-auto md:mx-0">
-             <img src={getMediaPoster(media)} className="w-full rounded-2xl shadow-2xl border border-white/10" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 mt-6">
+        
+        {/* Main Title Banner */}
+        <div className="mb-6">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="px-2.5 py-0.5 bg-red-600 text-white rounded text-xs font-black uppercase tracking-wider">
+              {isSeries ? 'مسلسل حصري' : 'فيلم VIP'}
+            </span>
+            <span className="px-2.5 py-0.5 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded text-xs font-bold flex items-center gap-1">
+              <Star className="w-3 h-3 fill-yellow-500" />
+              {item.vote_average ? Number(item.vote_average).toFixed(1) : '8.5'}
+            </span>
+            <span className="px-2.5 py-0.5 bg-white/5 text-gray-300 rounded text-xs font-medium">
+              4K ULTRA HD
+            </span>
+            <span className="px-2.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded text-xs font-medium">
+              مترجم للعربية
+            </span>
           </div>
+
+          <h1 className="text-2xl sm:text-4xl font-black text-white leading-tight">
+            {item.title}
+          </h1>
+          {item.original_title && item.original_title !== item.title && (
+            <p className="text-gray-400 text-sm mt-1 font-mono">{item.original_title}</p>
+          )}
+        </div>
+
+        {/* Video Player Section */}
+        <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10">
           
-          <div className="flex-1 space-y-6 pt-10 md:pt-32 text-center md:text-right">
-            <h1 className="text-4xl md:text-6xl font-black" dir="ltr" style={{ textAlign: 'right' }}>
-              {media.title}
-            </h1>
-            
-            <div className="flex items-center justify-center md:justify-start gap-4 text-sm font-bold">
-              <span className="text-yellow-400 flex items-center gap-1 bg-yellow-400/10 px-3 py-1 rounded-lg">
-                <Star className="w-4 h-4 fill-yellow-400" /> {getMediaRating(media)}
-              </span>
-              <span className="text-gray-400">{getMediaYear(media)}</span>
-              <span className="bg-red-600/10 text-red-500 px-2 py-0.5 rounded">4K ULTRA HD</span>
-              <span className="text-emerald-400">مترجم للعربية</span>
-            </div>
-
-            <p className="text-gray-400 max-w-2xl text-sm md:text-base leading-relaxed">
-              {media.overview}
-            </p>
-            
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 pt-4">
-              <button 
-                onClick={handlePlayAction}
-                className="bg-red-600 hover:bg-red-700 text-white px-10 py-4 rounded-2xl font-black flex items-center gap-3 shadow-xl shadow-red-600/30 transition-all hover:scale-105"
-              >
-                <Play className="w-6 h-6 fill-white" /> مشاهدة الفيلم
-              </button>
-              
-              {/* زر التحميل اللي بيفتح نافذة السيرفرات */}
-              <button 
-                onClick={() => {
-                  setDownloadStep('select');
-                  setShowDownloadModal(true);
-                }}
-                className="bg-white/10 hover:bg-white/15 text-white border border-white/10 px-8 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all hover:border-red-600/50"
-              >
-                <Download className="w-5 h-5" /> سيرفرات التحميل المباشر
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* قسم المشغل الإعلاني / الحقيقي */}
-        <div ref={playerRef} className="mt-16">
-          {showAdOverlay && (
-            <div className="relative aspect-video w-full rounded-3xl overflow-hidden bg-[#0c0d12] border border-red-600/30 shadow-2xl flex flex-col items-center justify-center text-center p-6">
-              <div className="space-y-6 max-w-md">
-                <div className="w-20 h-20 rounded-full bg-red-600/10 flex items-center justify-center mx-auto text-red-600 border border-red-600/20">
-                  <ShieldCheck className="w-10 h-10" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-white">سيرفر المشاهدة جاهز الآن</h3>
-                  <p className="text-gray-400 text-xs mt-2">اضغط على الزر أدناه لبدء العرض فوراً بأعلى جودة وترجمة عربية.</p>
-                </div>
-                
-                <button 
-                  onClick={() => {
-                    setShowAdOverlay(false);
-                    setIsPlaying(true);
-                  }}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-2xl flex items-center justify-center gap-2 transition-all shadow-xl"
-                >
-                  <Play className="w-5 h-5 fill-white" /> تشغيل الفيلم الآن
-                </button>
-              </div>
-            </div>
-          )}
-
-          {isPlaying && (
-            <div className="space-y-6">
-              <div className="aspect-video w-full rounded-3xl overflow-hidden bg-black border border-white/10 shadow-2xl">
-                <iframe src={streamingServers[activeServer].url} className="w-full h-full" allowFullScreen />
-              </div>
-              
-              <div className="flex flex-wrap gap-3 justify-center bg-[#121318] p-3 rounded-2xl border border-white/5">
-                {streamingServers.map((s, i) => (
-                  <button 
-                    key={i} 
-                    onClick={() => {
-                      window.open(monetagDirectLink, '_blank');
-                      setActiveServer(i);
-                    }} 
-                    className={`px-6 py-3 rounded-xl text-xs font-black transition-all ${activeServer === i ? 'bg-red-600 text-white shadow-lg' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
-                  >
-                    {s.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* بانر إعلاني */}
-        <AdBanner slot="bottom" className="mt-12" />
-      </div>
-
-      {/* مودال سيرفرات التحميل المباشر الاحترافي */}
-      {showDownloadModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in">
-          <div className="bg-[#121318] border border-white/10 rounded-3xl max-w-2xl w-full p-6 relative shadow-2xl">
-            
-            {/* زر إغلاق */}
-            <button 
-              onClick={() => setShowDownloadModal(false)}
-              className="absolute top-5 left-5 text-gray-400 hover:text-white p-1 rounded-lg bg-white/5"
+          {/* Simulated First-Click High-CPM Pre-Roll Overlay */}
+          {!hasTriggeredPreRoll && (
+            <div 
+              onClick={handlePlayerOverlayClick}
+              className="absolute inset-0 z-30 cursor-pointer flex flex-col items-center justify-center bg-black/40 backdrop-blur-sm group hover:bg-black/20 transition"
             >
-              <X className="w-5 h-5" />
-            </button>
-
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-red-600/20 text-red-500 flex items-center justify-center">
-                <ArrowDownToLine className="w-5 h-5" />
+              <div className="w-20 h-20 bg-red-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-red-600/60 group-hover:scale-110 transition duration-300">
+                <Play className="w-10 h-10 ml-1 fill-white" />
               </div>
-              <div>
-                <h3 className="text-xl font-black text-white">سيرفرات التحميل المباشر 📥</h3>
-                <p className="text-xs text-gray-400">اختر الجودة والسيرفر المناسب لبدء التحميل بأقصى سرعة</p>
-              </div>
-            </div>
-
-            {/* المرحلة 1: اختيار الجودة والسيرفر */}
-            {downloadStep === 'select' && (
-              <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-                {downloadTiers.map((tier, idx) => (
-                  <div key={idx} className="bg-[#181a22] border border-white/5 rounded-2xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-white">{tier.quality}</span>
-                        <span className="text-[10px] bg-red-600/20 text-red-400 border border-red-600/30 px-2 py-0.5 rounded-md font-bold">
-                          {tier.tag}
-                        </span>
-                      </div>
-                      <span className="text-xs text-gray-400 font-mono font-bold bg-white/5 px-2 py-1 rounded">
-                        {tier.size}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                      {tier.servers.map((srv, sIdx) => (
-                        <button
-                          key={sIdx}
-                          onClick={() => handleDownloadServerClick(srv.url)}
-                          className="flex items-center justify-between bg-white/5 hover:bg-red-600 hover:text-white text-gray-300 p-2.5 rounded-xl border border-white/5 transition-all text-xs font-bold group"
-                        >
-                          <span className="truncate">{srv.name}</span>
-                          <Download className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 flex-shrink-0" />
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* المرحلة 2: عداد فحص وتوليد الرابط الآمن */}
-            {downloadStep === 'generating' && (
-              <div className="py-12 text-center space-y-4">
-                <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                <h4 className="text-lg font-bold text-white">جاري إنشاء رابط التحميل المباشر الآمن...</h4>
-                <p className="text-xs text-gray-400">يرجى الانتظار ثوانٍ معدودة لفحص الملف ({countdown})</p>
-              </div>
-            )}
-
-            {/* المرحلة 3: الرابط جاهز للتحميل */}
-            {downloadStep === 'ready' && (
-              <div className="py-8 text-center space-y-5">
-                <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto border border-emerald-500/30">
-                  <Check className="w-8 h-8" />
-                </div>
-                <div>
-                  <h4 className="text-xl font-black text-white">رابط التحميل جاهز الآن بنجاح! 🎉</h4>
-                  <p className="text-xs text-gray-400 mt-1">اضغط على الزر بالأسفل لبدء التنزيل المباشر فوراً بأقصى سرعة.</p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                  <a
-                    href={activeDownloadUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black px-8 py-3.5 rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/30 transition-all"
-                  >
-                    <Download className="w-5 h-5" /> بدء التنزيل الآن (Download)
-                  </a>
-
-                  <button
-                    onClick={() => setDownloadStep('select')}
-                    className="bg-white/5 hover:bg-white/10 text-gray-300 font-bold px-6 py-3.5 rounded-xl text-sm transition-all"
-                  >
-                    اختيار جودة أخرى
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <div className="mt-4 pt-3 border-t border-white/5 text-center">
-              <p className="text-[11px] text-gray-500">
-                🔒 سيرفراتنا آمنة وخالية من أي ملفات ضارة ومحمية بروابط مشفرة عالية السرعة.
+              <p className="mt-4 font-bold text-white text-base bg-black/80 px-4 py-1.5 rounded-full border border-white/10">
+                اضغط هنا لبدء المشاهدة بأعلى جودة سيرفر
               </p>
             </div>
+          )}
+
+          <iframe
+            src={getEmbedUrl()}
+            className="w-full h-full border-0"
+            allowFullScreen
+            allow="autoplay; encrypted-media; picture-in-picture"
+          />
+        </div>
+
+        {/* Server & Action Controls */}
+        <div className="mt-4 p-4 bg-[#111116] border border-white/5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-gray-400 font-bold ml-2">سيرفر المشاهدة:</span>
+            <button
+              onClick={() => setActiveServer('vidlink')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                activeServer === 'vidlink' 
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              سيرفر VIP 1 (الأساسي)
+            </button>
+
+            <button
+              onClick={() => setActiveServer('embedsu')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+                activeServer === 'embedsu' 
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              سيرفر VIP 2 (احتياطي)
+            </button>
+
+            <button
+              onClick={() => setActiveServer('autoembed')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+                activeServer === 'autoembed' 
+                  ? 'bg-red-600 text-white shadow-lg shadow-red-600/30' 
+                  : 'bg-white/5 text-gray-400 hover:bg-white/10'
+              }`}
+            >
+              سيرفر VIP 3 (سريع)
+            </button>
+          </div>
+
+          <button
+            onClick={() => setShowDownloadModal(true)}
+            className="px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-95"
+          >
+            <Download className="w-4 h-4" />
+            <span>تحميل {isSeries ? `الحلقة (${selectedEpisode})` : 'العمل'}</span>
+          </button>
+        </div>
+
+        {/* ======================================================== */}
+        {/* TV SERIES: SEASONS & EPISODES SELECTOR                   */}
+        {/* ======================================================== */}
+        {isSeries && (
+          <div className="mt-8 bg-[#111116] border border-white/10 rounded-2xl p-6">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-white/5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-600/10 border border-red-600/30 flex items-center justify-center text-red-500">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white">قائمة المواسم والحلقات</h3>
+                  <p className="text-xs text-gray-400">اختر الموسم ثم اضغط على رقم الحلقة للتشغيل الفوري</p>
+                </div>
+              </div>
+
+              {/* Seasons Selector Tabs */}
+              {seasons.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+                  {seasons.map((season) => (
+                    <button
+                      key={season.season_number}
+                      onClick={() => handleSeasonChange(season.season_number)}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition ${
+                        selectedSeason === season.season_number
+                          ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
+                          : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/5'
+                      }`}
+                    >
+                      {season.name || `الموسم ${season.season_number}`}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Episodes Grid */}
+            {loadingEpisodes ? (
+              <div className="py-12 flex justify-center items-center">
+                <div className="w-8 h-8 border-3 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+              </div>
+            ) : episodes.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {episodes.map((ep) => {
+                  const isCurrent = selectedEpisode === ep.episode_number;
+                  return (
+                    <button
+                      key={ep.episode_number}
+                      onClick={() => setSelectedEpisode(ep.episode_number)}
+                      className={`p-3 rounded-xl border text-right transition group relative overflow-hidden flex flex-col justify-between ${
+                        isCurrent 
+                          ? 'bg-red-600/10 border-red-600 text-white shadow-md shadow-red-600/20' 
+                          : 'bg-white/5 border-white/5 hover:border-white/20 text-gray-300 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded ${isCurrent ? 'bg-red-600 text-white' : 'bg-white/10 text-gray-300'}`}>
+                          الحلقة {ep.episode_number}
+                        </span>
+                        {isCurrent && <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
+                      </div>
+                      <p className="text-xs font-medium text-gray-200 line-clamp-1 group-hover:text-red-400 transition">
+                        {ep.name || `الحلقة ${ep.episode_number}`}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-gray-400 text-sm">
+                جاري إعداد حلقات هذا الموسم...
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Media Story & Info Section */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="md:col-span-2 bg-[#111116] border border-white/5 rounded-2xl p-6">
+            <h3 className="text-lg font-bold text-white mb-3">قصة العمل</h3>
+            <p className="text-gray-300 text-sm leading-relaxed">
+              {item.overview || 'تدور أحداث هذا العمل في إطار شيق ومليء بالإثارة والتشويق مع نخبة من ألمع النجوم.'}
+            </p>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-6 pt-6 border-t border-white/5">
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">النوع</span>
+                <span className="text-sm font-bold text-white">{isSeries ? 'مسلسل تلفزيوني' : 'فيلم سينمائي'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">سنة الإصدار</span>
+                <span className="text-sm font-bold text-white">{item.release_date ? new Date(item.release_date).getFullYear() : '2024'}</span>
+              </div>
+              <div>
+                <span className="text-xs text-gray-500 block mb-1">اللغة والترجمة</span>
+                <span className="text-sm font-bold text-emerald-400">مترجم حصرياً</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#111116] border border-white/5 rounded-2xl p-6 flex flex-col justify-between">
+            <div>
+              <h3 className="text-base font-bold text-white mb-4">مميزات المشاهدة على سينما بلاس</h3>
+              <ul className="space-y-3 text-xs text-gray-300">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span>سيرفرات فائقة السرعة بدون تقطيع</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span>جودة أصلية 1080p Full HD و 4K</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span>ترجمة عربية متزامنة ودقيقة</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                  <span>دعم المشاهدة والتحميل على الهاتف والتلفاز</span>
+                </li>
+              </ul>
+            </div>
+
+            <button 
+              onClick={() => window.open(DIRECT_AD_LINK, '_blank')}
+              className="mt-6 w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-yellow-400 flex items-center justify-center gap-2 transition"
+            >
+              <Sparkles className="w-4 h-4 text-yellow-400" />
+              <span>ترقية الحساب إلى VIP مجاناً</span>
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      {/* ======================================================== */}
+      {/* HIGH-CONVERTING DOWNLOAD MODAL                           */}
+      {/* ======================================================== */}
+      {showDownloadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
+          <div className="bg-[#121218] border border-white/10 rounded-3xl p-6 max-w-md w-full shadow-2xl relative text-center">
+            
+            <button 
+              onClick={() => {
+                setShowDownloadModal(false);
+                setCountdown(null);
+                setDownloadReady(false);
+              }}
+              className="absolute top-4 left-4 text-gray-400 hover:text-white text-lg font-bold"
+            >
+              ✕
+            </button>
+
+            <div className="w-16 h-16 bg-emerald-600/10 border border-emerald-500/30 text-emerald-400 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-emerald-500/20">
+              <Download className="w-8 h-8" />
+            </div>
+
+            <h3 className="text-xl font-black text-white mb-1">
+              تحميل: {item.title}
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">
+              {isSeries ? `الموسم ${selectedSeason} - الحلقة ${selectedEpisode}` : 'نسخة BluRay الأصلية'}
+            </p>
+
+            {/* Quality Options */}
+            <div className="grid grid-cols-3 gap-2 mb-6">
+              {['1080p FHD', '720p HD', '480p SD'].map((quality) => (
+                <button
+                  key={quality}
+                  onClick={() => setSelectedQuality(quality)}
+                  className={`py-2 rounded-xl text-xs font-bold border transition ${
+                    selectedQuality === quality 
+                      ? 'bg-emerald-600 border-emerald-500 text-white' 
+                      : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10'
+                  }`}
+                >
+                  {quality}
+                </button>
+              ))}
+            </div>
+
+            {/* Download Logic */}
+            {countdown === null && !downloadReady && (
+              <button
+                onClick={handleStartDownload}
+                className="w-full py-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-sm shadow-xl shadow-emerald-600/30 transition active:scale-95"
+              >
+                توليد رابط التحميل المباشر
+              </button>
+            )}
+
+            {countdown !== null && countdown > 0 && (
+              <div className="py-4 bg-white/5 rounded-2xl border border-white/5">
+                <p className="text-xs text-gray-400 mb-2">جاري تجهيز سيرفر التحميل السريع...</p>
+                <span className="text-3xl font-black text-emerald-400 font-mono">{countdown}s</span>
+              </div>
+            )}
+
+            {downloadReady && (
+              <a
+                href={DIRECT_AD_LINK}
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm rounded-xl shadow-xl shadow-emerald-500/40 flex items-center justify-center gap-2 transition animate-bounce"
+              >
+                <CheckCircle2 className="w-5 h-5 text-black" />
+                <span>اضغط هنا لبدء التحميل الآن ({selectedQuality})</span>
+              </a>
+            )}
+
+            <p className="text-[11px] text-gray-500 mt-4">
+              الروابط مجانية ومباشرة بدون انتظار طويل
+            </p>
           </div>
         </div>
       )}
+
     </div>
   );
 }
