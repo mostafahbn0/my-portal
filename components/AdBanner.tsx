@@ -1,34 +1,55 @@
-'use client';
+"use client";
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 
-export function StickyBanner() {
+interface AdBannerProps {
+  type: 'top' | 'sticky' | 'rectangle' | 'inline';
+}
+
+export default function AdBanner({ type }: AdBannerProps) {
   const [closed, setClosed] = useState(false);
+
   if (closed) return null;
 
-  return (
-    <div className="fixed bottom-0 inset-x-0 z-50 flex flex-col items-center justify-center pointer-events-none pb-2">
-      <div className="relative pointer-events-auto bg-[#101014]/95 border border-white/10 p-2 rounded-xl shadow-2xl backdrop-blur-md flex items-center justify-center max-w-[750px] w-full mx-4">
+  if (type === 'sticky') {
+    return (
+      <div className="fixed bottom-0 inset-x-0 z-50 bg-[#0c0c0e]/95 backdrop-blur-md border-t border-red-600/30 p-2 flex items-center justify-center shadow-2xl">
         <button 
-          onClick={() => setClosed(true)} 
-          className="absolute -top-3 -right-2 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full text-xs shadow-lg transition"
+          onClick={() => setClosed(true)}
+          className="absolute -top-4 right-4 bg-red-600 hover:bg-red-700 text-white rounded-full p-1 text-xs shadow transition"
           title="إغلاق الإعلان"
         >
           <X size={14} />
         </button>
-        <div className="w-full h-[70px] md:h-[90px] border border-dashed border-white/20 rounded-lg flex items-center justify-center bg-black/40 text-gray-400 text-xs font-mono">
-          <span>مساحة إعلانية عائمة (Sticky Banner 728x90) - ضع كود شركتك هنا</span>
+        <div className="w-[728px] max-w-full h-[70px] bg-white/5 border border-dashed border-white/10 rounded flex items-center justify-center text-xs text-gray-500">
+          <span>مساحة إعلانية ثابتة (728×90 Responsive)</span>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-export function ContentBanner({ text = "مساحة إعلانية (Responsive Banner)" }: { text?: string }) {
+  if (type === 'rectangle') {
+    return (
+      <div className="w-full h-[250px] bg-white/5 border border-dashed border-white/10 rounded-xl flex items-center justify-center text-xs text-gray-500">
+        <span>مساحة إعلانية مربعة (300×250)</span>
+      </div>
+    );
+  }
+
+  if (type === 'top') {
+    return (
+      <div className="container mx-auto px-4 my-4">
+        <div className="w-full h-[90px] bg-white/5 border border-dashed border-white/10 rounded-xl flex items-center justify-center text-xs text-gray-500">
+          <span>بانر إعلاني علوي (Leaderboard 728×90)</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="my-8 max-w-[1400px] mx-auto px-4">
-      <div className="w-full h-[90px] md:h-[120px] border border-dashed border-white/15 rounded-2xl flex items-center justify-center bg-[#101014]/50 text-gray-500 text-xs font-mono">
-        {text}
+    <div className="w-full my-8">
+      <div className="w-full h-[90px] bg-white/5 border border-dashed border-white/10 rounded-xl flex items-center justify-center text-xs text-gray-500">
+        <span>بانر إعلاني مدمج بين المحتوى</span>
       </div>
     </div>
   );
