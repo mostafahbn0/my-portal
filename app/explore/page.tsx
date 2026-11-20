@@ -38,11 +38,13 @@ function ExploreContent() {
         query = query.eq('type', selectedType);
       }
 
+      // البحث ثنائي اللغة (العربي أو الإنجليزي)
       if (searchQuery.trim() !== '') {
-        query = query.ilike('title', `%${searchQuery}%`);
+        const clean = searchQuery.trim();
+        query = query.or(`title.ilike.%${clean}%,original_title.ilike.%${clean}%`);
       }
 
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data } = await query.order('created_at', { ascending: false });
 
       if (data && data.length > 0) {
         if (selectedGenre !== 'all') {
@@ -64,12 +66,12 @@ function ExploreContent() {
 
   const handleTypeChange = (type: string) => {
     setSelectedType(type);
-    router.push(`/explore?type=${type}&genre=${selectedGenre}&q=${searchQuery}`);
+    router.push(`/explore?type=${type}&genre=${selectedGenre}&q=${encodeURIComponent(searchQuery)}`);
   };
 
   const handleGenreChange = (genre: string) => {
     setSelectedGenre(genre);
-    router.push(`/explore?type=${selectedType}&genre=${genre}&q=${searchQuery}`);
+    router.push(`/explore?type=${selectedType}&genre=${genre}&q=${encodeURIComponent(searchQuery)}`);
   };
 
   const getPageTitle = () => {
@@ -82,16 +84,14 @@ function ExploreContent() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      {/* رأس الصفحة وفلاتر النوع */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-2 border-r-4 border-red-600 pr-3">
             {getPageTitle()}
           </h1>
-          <p className="text-gray-400 text-xs mt-1">تصفح وشاهد بدقة عالية وبدون إعلانات مزعجة</p>
+          <p className="text-gray-400 text-xs mt-1">تصفح أحدث الأعمال بجودة عالية وباللغتين العربية والإنجليزية</p>
         </div>
 
-        {/* أزرار التبديل السريع */}
         <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-fit">
           <button 
             onClick={() => handleTypeChange('all')}
@@ -120,7 +120,6 @@ function ExploreContent() {
         </div>
       </div>
 
-      {/* شريط التصنيفات (Genres Pills) */}
       <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none mb-6">
         <span className="text-xs text-gray-500 font-bold flex items-center gap-1 flex-shrink-0 ml-2">
           <Filter size={14} /> التصنيف:
@@ -142,7 +141,6 @@ function ExploreContent() {
 
       <AdBanner type="top" />
 
-      {/* شبكة الأعمال */}
       {loading ? (
         <div className="py-20 text-center text-red-600 font-bold">جاري تحميل الأعمال...</div>
       ) : items.length > 0 ? (
@@ -154,9 +152,9 @@ function ExploreContent() {
       ) : (
         <div className="py-24 text-center bg-white/5 rounded-2xl border border-dashed border-white/10 p-8">
           <Search size={40} className="mx-auto text-gray-500 mb-3 opacity-40" />
-          <h3 className="text-lg font-bold text-white mb-1">لم نعثر على أي أعمال</h3>
+          <h3 className="text-lg font-bold text-white mb-1">لم نعثر على أي نتائج</h3>
           <p className="text-xs text-gray-400 max-w-sm mx-auto">
-            جرب اختيار تصنيف آخر أو البحث بكلمات مختلفة، أو يمكنك طلب إضافة العمل من زر "اطلب عملك".
+            تأكد من كتابة الاسم بشكل صحيح سواء بالعربية أو بالإنجليزية.
           </p>
         </div>
       )}
@@ -170,7 +168,6 @@ export default function ExplorePage() {
   return (
     <main className="min-h-screen bg-[#08080a] text-white" dir="rtl">
       <Navbar />
-      {/* الـ Suspense ده هو اللي بيمنع الـ Crash في Next.js 14 تماماً */}
       <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-red-600 font-bold">جاري التحميل...</div>}>
         <ExploreContent />
       </Suspense>

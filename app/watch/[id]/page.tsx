@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Navbar from '@/components/Navbar';
 import AdBanner from '@/components/AdBanner';
 import { getMediaPoster, getMediaBackdrop, getMediaYear, getMediaRating, getImg } from '@/lib/utils';
-import { Play, Star, Calendar, Clock, Download, Users, Film, Tv, ShieldCheck, Languages, CheckCircle2 } from 'lucide-react';
+import { Play, Star, Calendar, Clock, Download, Users, Film, Tv, ShieldCheck, Languages, CheckCircle2, Share2, Copy, Check, Sparkles } from 'lucide-react';
 
 export default function WatchPage() {
   const { id } = useParams();
@@ -17,6 +17,7 @@ export default function WatchPage() {
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
   const [tmdbData, setTmdbData] = useState<any>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     async function loadWork() {
@@ -27,7 +28,7 @@ export default function WatchPage() {
         if (data.tmdb_id) {
           try {
             const tmdbEndpoint = data.type === 'movie' ? 'movie' : 'tv';
-            const res = await fetch(`https://api.themoviedb.org/3/${tmdbEndpoint}/${data.tmdb_id}?api_key=204ce203e280acdfec221ea09ea5e763&append_to_response=credits&language=ar-SA`);
+            const res = await fetch(`https://api.themoviedb.org/3/${tmdbEndpoint}/${data.tmdb_id}?api_key=204ce203e280acdfec221ea09ea5e763&append_to_response=credits,videos&language=ar-SA`);
             const info = await res.json();
             setTmdbData(info);
           } catch (e) {
@@ -68,6 +69,22 @@ export default function WatchPage() {
     }, 150);
   };
 
+  const handleCopyLink = () => {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleWhatsAppShare = () => {
+    if (typeof window !== 'undefined') {
+      const title = media?.title || 'هذا العمل الرائع';
+      const text = encodeURIComponent(`🍿 شوف الفيلم الرهيب ده "${title}" مترجم بأعلى جودة HD وبدون إعلانات على سينما بلاس:\n${window.location.href}`);
+      window.open(`https://api.whatsapp.com/send?text=${text}`, '_blank');
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen bg-[#08080a] flex items-center justify-center text-red-600 font-bold">جاري تحميل السينما...</div>;
   }
@@ -84,7 +101,12 @@ export default function WatchPage() {
   const overview = media.overview || media.description || tmdbData?.overview || 'شاهد العمل بجودة فائقة الدقة وبترجمة عربية احترافية.';
   const title = media.title || media.name || tmdbData?.title || tmdbData?.name;
 
-  // سيرفرات البث المتوافقة
+  // التحقق هل الفيلم لسه مانزلش في السينما (Upcoming)
+  const isComingSoon = media.release_date && new Date(media.release_date) > new Date();
+
+  // جلب رابط التريلر الرسمي من TMDB إن وجد
+  const youtubeTrailer = tmdbData?.videos?.results?.find((v: any) => v.site === 'YouTube' && (v.type === 'Trailer' || v.type === 'Teaser'));
+
   const servers = [
     { 
       name: 'سيرفر VidLink VIP (ترجمة عربية تلقائية)', 
@@ -139,10 +161,16 @@ export default function WatchPage() {
 
             <div className="flex-1 text-center md:text-right">
               <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-3">
-                <span className="bg-red-600 text-white font-bold text-xs px-2.5 py-0.5 rounded flex items-center gap-1 shadow">
-                  <Languages size={13} /> مترجم للعربية
-                </span>
-                <span className="bg-white/10 text-white font-bold text-xs px-2 py-0.5 rounded">FHD 1080p</span>
+                {isComingSoon ? (
+                  <span className="bg-amber-600 text-white font-black text-xs px-2.5 py-0.5 rounded flex items-center gap-1 shadow">
+                    <Sparkles size={13} /> قريباً في صالات السينما
+                  </span>
+                ) : (
+                  <span className="bg-red-600 text-white font-bold text-xs px-2.5 py-0.5 rounded flex items-center gap-1 shadow">
+                    <Languages size={13} /> مترجم للعربية HD
+                  </span>
+                )}
+                
                 {Number(rating) > 0 && (
                   <span className="bg-yellow-500/20 text-yellow-400 font-bold text-xs px-2 py-0.5 rounded flex items-center gap-1 border border-yellow-500/30">
                     <Star size={13} fill="currentColor" /> {rating}
@@ -153,12 +181,14 @@ export default function WatchPage() {
                     <Calendar size={13} /> {year}
                   </span>
                 )}
-                <span className="text-gray-400 text-xs flex items-center gap-1">
-                  <Clock size={13} /> {media.duration || 'ساعتان'}
-                </span>
               </div>
 
               <h1 className="text-2xl sm:text-4xl font-black mb-3 text-white leading-tight">{title}</h1>
+              {media.original_title && media.original_title !== title && (
+                <p className="text-sm text-gray-400 font-sans -mt-2 mb-3 font-semibold tracking-wide">
+                  {media.original_title}
+                </p>
+              )}
               
               <div className="flex flex-wrap justify-center md:justify-start gap-1.5 mb-4">
                 {media.genres && Array.isArray(media.genres) && media.genres.map((g: string) => (
@@ -172,20 +202,41 @@ export default function WatchPage() {
                 {overview}
               </p>
 
+              {/* أزرار المشاهدة والمشاركة الفيروسية */}
               <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                <button 
-                  onClick={handleStartWatching}
-                  className="bg-red-600 hover:bg-red-700 text-white font-bold text-sm px-6 py-3 rounded-xl flex items-center gap-2 transition shadow-lg shadow-red-600/30 hover:scale-105"
+                {isComingSoon ? (
+                  <button 
+                    onClick={handleStartWatching}
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm px-6 py-3 rounded-xl flex items-center gap-2 transition shadow-lg shadow-amber-600/30"
+                  >
+                    <Play size={18} fill="currentColor" /> مشاهدة الإعلان الرسمي (Trailer)
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handleStartWatching}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold text-sm px-6 py-3 rounded-xl flex items-center gap-2 transition shadow-lg shadow-red-600/30 hover:scale-105"
+                  >
+                    <Play size={18} fill="currentColor" /> مشاهدة الفيلم الآن
+                  </button>
+                )}
+
+                {/* أزرار المشاركة الفيروسية على السوشيال ميديا */}
+                <button
+                  onClick={handleWhatsAppShare}
+                  className="bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white border border-green-600/30 font-bold text-sm px-4 py-3 rounded-xl flex items-center gap-2 transition"
                 >
-                  <Play size={18} fill="currentColor" /> مشاهدة الفيلم الآن
+                  <Share2 size={16} /> شارك عبر واتساب
                 </button>
-                <a 
-                  href="#downloads"
-                  className="bg-white/10 hover:bg-white/20 text-white font-bold text-sm px-6 py-3 rounded-xl flex items-center gap-2 transition"
+
+                <button
+                  onClick={handleCopyLink}
+                  className="bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-sm px-4 py-3 rounded-xl flex items-center gap-2 transition border border-white/10"
                 >
-                  <Download size={18} /> تحميل مباشر
-                </a>
+                  {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
+                  <span>{copied ? 'تم نسخ الرابط!' : 'نسخ الرابط'}</span>
+                </button>
               </div>
+
             </div>
           </div>
         </div>
@@ -193,47 +244,57 @@ export default function WatchPage() {
 
       <div className="container mx-auto px-4 py-8">
         
-        {/* شاشة العرض وسيرفرات البث */}
+        {/* شاشة العرض */}
         {showPlayer && (
           <div id="player-screen" className="mb-12 scroll-mt-20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
               <span className="font-bold text-sm text-red-500 flex items-center gap-2">
-                <Film size={18} /> سيرفر المشاهدة المباشر:
+                <Film size={18} /> {isComingSoon ? 'الإعلان التشويقي الرسمي:' : 'مشغل الفيديو المباشر:'}
               </span>
-              <div className="flex flex-wrap gap-1.5 bg-white/5 p-1 rounded-lg border border-white/10">
-                {servers.map((s, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setActiveServer(idx)}
-                    className={`px-3 py-1 rounded text-xs font-bold transition ${activeServer === idx ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
-                  >
-                    {s.name}
-                  </button>
-                ))}
-              </div>
+              
+              {!isComingSoon && (
+                <div className="flex flex-wrap gap-1.5 bg-white/5 p-1 rounded-lg border border-white/10">
+                  {servers.map((s, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveServer(idx)}
+                      className={`px-3 py-1 rounded text-xs font-bold transition ${activeServer === idx ? 'bg-red-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      {s.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* تم إزالة Sandbox نهائياً ليعمل المشغل بكفاءة وبدون أخطاء */}
             <div className="relative aspect-video w-full bg-black rounded-2xl overflow-hidden border border-white/10 shadow-2xl">
-              <iframe
-                src={servers[activeServer]?.url}
-                className="w-full h-full"
-                allowFullScreen
-                allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-              />
+              {isComingSoon && youtubeTrailer ? (
+                <iframe
+                  src={`https://www.youtube.com/embed/${youtubeTrailer.key}?autoplay=1`}
+                  className="w-full h-full"
+                  allowFullScreen
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              ) : (
+                <iframe
+                  src={servers[activeServer]?.url}
+                  className="w-full h-full"
+                  allowFullScreen
+                  allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+                />
+              )}
             </div>
 
             <div className="mt-3 bg-[#121216] border border-white/5 rounded-xl p-3 flex items-center justify-between text-xs text-gray-400">
               <div className="flex items-center gap-2 text-green-400">
                 <CheckCircle2 size={16} />
-                <span>مشغل سريع يدعم الترجمة العربية تلقائياً والتحكم في الجودة.</span>
+                <span>{isComingSoon ? `الفيلم سينزل رسمياً في صالات السينما بتاريخ: ${media.release_date}` : 'مشغل سريع يدعم الترجمة العربية تلقائياً والتحكم في الجودة.'}</span>
               </div>
-              <span className="text-gray-500 hidden sm:inline">سيرفر نشط</span>
             </div>
           </div>
         )}
 
-        {/* حلقات المسلسل في مربعات أنيقة */}
+        {/* حلقات المسلسل */}
         {!isMovie && (
           <div className="mb-12">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
@@ -278,7 +339,7 @@ export default function WatchPage() {
           </div>
         )}
 
-        {/* طاقم التمثيل وروابط التحميل */}
+        {/* الممثلين والتحميل */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             {tmdbData?.credits?.cast && (
@@ -307,55 +368,57 @@ export default function WatchPage() {
             )}
 
             {/* روابط التحميل */}
-            <div id="downloads" className="bg-[#121216] border border-white/5 p-6 rounded-2xl">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
-                <Download size={18} className="text-red-600" /> روابط التحميل المباشر مع ملف الترجمة
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <a 
-                  href="#" 
-                  onClick={handleStartWatching} 
-                  className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
-                >
-                  <div>
-                    <p className="font-bold text-xs">جودة 1080p FHD (مترجم)</p>
-                    <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 2.4 جيجا</span>
-                  </div>
-                  <Download size={16} />
-                </a>
-                <a 
-                  href="#" 
-                  onClick={handleStartWatching} 
-                  className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
-                >
-                  <div>
-                    <p className="font-bold text-xs">جودة 720p HD (مترجم)</p>
-                    <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 1.1 جيجا</span>
-                  </div>
-                  <Download size={16} />
-                </a>
-                <a 
-                  href="#" 
-                  onClick={handleStartWatching} 
-                  className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
-                >
-                  <div>
-                    <p className="font-bold text-xs">جودة 480p SD (مترجم)</p>
-                    <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 450 ميجا</span>
-                  </div>
-                  <Download size={16} />
-                </a>
+            {!isComingSoon && (
+              <div id="downloads" className="bg-[#121216] border border-white/5 p-6 rounded-2xl">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
+                  <Download size={18} className="text-red-600" /> روابط التحميل المباشر مع ملف الترجمة
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <a 
+                    href="#" 
+                    onClick={handleStartWatching} 
+                    className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
+                  >
+                    <div>
+                      <p className="font-bold text-xs">جودة 1080p FHD (مترجم)</p>
+                      <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 2.4 جيجا</span>
+                    </div>
+                    <Download size={16} />
+                  </a>
+                  <a 
+                    href="#" 
+                    onClick={handleStartWatching} 
+                    className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
+                  >
+                    <div>
+                      <p className="font-bold text-xs">جودة 720p HD (مترجم)</p>
+                      <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 1.1 جيجا</span>
+                    </div>
+                    <Download size={16} />
+                  </a>
+                  <a 
+                    href="#" 
+                    onClick={handleStartWatching} 
+                    className="bg-white/5 hover:bg-red-600 hover:text-white border border-white/5 p-3 rounded-xl flex justify-between items-center transition group"
+                  >
+                    <div>
+                      <p className="font-bold text-xs">جودة 480p SD (مترجم)</p>
+                      <span className="text-[10px] text-gray-400 group-hover:text-white">حجم 450 ميجا</span>
+                    </div>
+                    <Download size={16} />
+                  </a>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <aside className="space-y-6">
             <AdBanner type="rectangle" />
             <div className="bg-[#121216] border border-white/5 p-4 rounded-xl text-xs space-y-2 text-gray-400">
               <div className="flex items-center gap-2 text-green-400 font-bold mb-1">
-                <ShieldCheck size={16} /> بث مباشر سريع
+                <ShieldCheck size={16} /> سيرفرات أصلية ومحدثة
               </div>
-              <p>تم تحديث المشغل ليعمل بأعلى كفاءة وسرعة على جميع الهواتف والمتصفحات.</p>
+              <p>يتم تحديث الجودات فور نزول النسخ الرسمية على الإنترنت.</p>
             </div>
           </aside>
         </div>

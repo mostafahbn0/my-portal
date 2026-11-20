@@ -20,7 +20,6 @@ export default function Navbar() {
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  // إغلاق قائمة البحث عند الضغط خارجها
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
@@ -31,7 +30,7 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // دالة البحث اللحظي عند الكتابة
+  // بحث ثنائي اللغة (عربي + إنجليزي)
   useEffect(() => {
     if (!searchTerm.trim()) {
       setSearchResults([]);
@@ -41,16 +40,19 @@ export default function Navbar() {
 
     const timer = setTimeout(async () => {
       setSearchLoading(true);
+      const cleanTerm = searchTerm.trim();
+      
+      // يبحث في الحقل العربي والحقل الإنجليزي معاً
       const { data } = await supabase
         .from('media')
         .select('*')
-        .ilike('title', `%${searchTerm.trim()}%`)
-        .limit(5);
+        .or(`title.ilike.%${cleanTerm}%,original_title.ilike.%${cleanTerm}%`)
+        .limit(6);
 
       setSearchResults(data || []);
       setSearchLoading(false);
       setShowResults(true);
-    }, 250);
+    }, 200);
 
     return () => clearTimeout(timer);
   }, [searchTerm]);
@@ -63,7 +65,6 @@ export default function Navbar() {
     }
   };
 
-  // اختيار فيلم عشوائي (فشار الحظ)
   const handleRandomMovie = async () => {
     const { data } = await supabase.from('media').select('id');
     if (data && data.length > 0) {
@@ -89,7 +90,6 @@ export default function Navbar() {
       <nav className="bg-[#08080a]/95 backdrop-blur-md sticky top-0 z-40 border-b border-white/5 py-3">
         <div className="container mx-auto px-4 flex justify-between items-center gap-4">
           
-          {/* الشعار والروابط */}
           <div className="flex items-center gap-6">
             <Link href="/" className="text-xl sm:text-2xl font-black text-red-600 flex items-center gap-2 tracking-tighter">
               <PlayCircle size={28} fill="currentColor" /> سينما بلاس
@@ -109,7 +109,6 @@ export default function Navbar() {
             </div>
           </div>
           
-          {/* البحث اللحظي الذكي والأزرار */}
           <div className="flex items-center gap-3">
             
             <div ref={searchRef} className="relative w-48 sm:w-64 md:w-80">
@@ -119,7 +118,7 @@ export default function Navbar() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   onFocus={() => { if (searchResults.length > 0) setShowResults(true); }}
-                  placeholder="ابحث عن فيلمك أو مسلسلك..." 
+                  placeholder="ابحث بالعربي أو الإنجليزي..." 
                   className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pr-9 pl-8 text-xs text-white focus:outline-none focus:border-red-600 transition" 
                 />
                 <Search className="absolute right-3 top-2.5 text-gray-400" size={15} />
@@ -132,7 +131,7 @@ export default function Navbar() {
                 ) : null}
               </form>
 
-              {/* القائمة العائمة للنتائج الفورية */}
+              {/* القائمة العائمة مع إظهار الاسمين */}
               {showResults && searchResults.length > 0 && (
                 <div className="absolute top-full mt-2 inset-x-0 bg-[#121216] border border-white/10 rounded-xl shadow-2xl overflow-hidden z-50 divide-y divide-white/5">
                   {searchResults.map((item) => (
@@ -140,23 +139,28 @@ export default function Navbar() {
                       key={item.id}
                       href={`/watch/${item.id}`}
                       onClick={() => setShowResults(false)}
-                      className="flex items-center gap-3 p-2 hover:bg-white/5 transition group"
+                      className="flex items-center gap-3 p-2.5 hover:bg-white/5 transition group"
                     >
                       <img 
                         src={getMediaPoster(item)} 
                         alt="" 
-                        className="w-9 h-12 object-cover rounded border border-white/10 flex-shrink-0"
+                        className="w-10 h-14 object-cover rounded border border-white/10 flex-shrink-0"
                       />
                       <div className="overflow-hidden flex-1 text-right">
                         <p className="text-xs font-bold text-white group-hover:text-red-500 transition truncate">
                           {item.title}
                         </p>
-                        <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
+                        {item.original_title && item.original_title !== item.title && (
+                          <p className="text-[10px] text-gray-400 truncate font-sans">
+                            {item.original_title}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-gray-500">
                           <span>{getMediaYear(item)}</span>
                           <span>•</span>
-                          <span className="text-red-500">{item.type === 'movie' ? 'فيلم' : item.type === 'anime' ? 'أنمي' : 'مسلسل'}</span>
+                          <span className="text-red-500 font-bold">{item.type === 'movie' ? 'فيلم' : item.type === 'anime' ? 'أنمي' : 'مسلسل'}</span>
                           {item.vote_average && (
-                            <span className="flex items-center gap-0.5 text-yellow-500 mr-auto">
+                            <span className="flex items-center gap-0.5 text-yellow-500 mr-auto font-bold">
                               <Star size={10} fill="currentColor" /> {Number(item.vote_average).toFixed(1)}
                             </span>
                           )}
@@ -166,25 +170,23 @@ export default function Navbar() {
                   ))}
                   <button
                     onClick={handleSearchSubmit}
-                    className="w-full py-2 text-center text-xs font-bold text-red-500 hover:bg-red-600/10 transition block"
+                    className="w-full py-2.5 text-center text-xs font-bold text-red-500 hover:bg-red-600/10 transition block"
                   >
-                    عرض جميع النتائج لـ "{searchTerm}"
+                    عرض كل نتائج البحث لـ "{searchTerm}"
                   </button>
                 </div>
               )}
             </div>
 
-            {/* زر فيلم عشوائي */}
             <button
               onClick={handleRandomMovie}
-              title="فشار الحظ: اختر لي عملاً عشوائياً"
+              title="فشار الحظ: عمل عشوائي"
               className="bg-white/5 hover:bg-white/10 text-white p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition border border-white/5"
             >
               <Shuffle size={15} className="text-red-500" />
               <span className="hidden sm:inline">فشار الحظ</span>
             </button>
 
-            {/* اطلب عملك */}
             <button 
               onClick={() => setShowModal(true)}
               className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-md shadow-red-600/30"
@@ -197,7 +199,6 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* مودال اطلب عملك */}
       {showModal && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <div className="bg-[#121216] border border-white/10 p-6 rounded-2xl w-full max-w-md relative">
@@ -212,12 +213,12 @@ export default function Navbar() {
             ) : (
               <form onSubmit={handleRequest} className="space-y-4">
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">اسم العمل</label>
+                  <label className="text-xs text-gray-400 block mb-1">اسم العمل (عربي أو إنجليزي)</label>
                   <input 
                     value={requestTitle}
                     onChange={(e) => setRequestTitle(e.target.value)}
                     required
-                    placeholder="مثال: The Batman أو ون بيس..." 
+                    placeholder="مثال: Interstellar أو ون بيس..." 
                     className="w-full bg-white/5 border border-white/10 rounded-lg p-2.5 text-sm text-white focus:outline-none focus:border-red-600"
                   />
                 </div>
