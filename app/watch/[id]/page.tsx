@@ -23,7 +23,6 @@ export default function WatchPage() {
       const { data } = await supabase.from('media').select('*').eq('id', id).single();
       if (data) {
         setMedia(data);
-        // تحميل الحلقات إذا كان مسلسل
         if (data.type !== 'movie') {
           const { data: epData } = await supabase
             .from('episodes')
@@ -34,7 +33,6 @@ export default function WatchPage() {
           if (epData && epData.length > 0) {
             setEpisodes(epData);
           } else {
-            // توليد حلقات افتراضية بالصور إذا لم تكن موجودة
             const dummy = Array.from({ length: 12 }, (_, i) => ({
               id: i + 1,
               season_number: 1,
@@ -46,7 +44,6 @@ export default function WatchPage() {
           }
         }
 
-        // جلب تفاصيل طاقم العمل من TMDB
         try {
           const tmdbEndpoint = data.type === 'movie' ? 'movie' : 'tv';
           const res = await fetch(`https://api.themoviedb.org/3/${tmdbEndpoint}/${data.tmdb_id}?api_key=204ce203e280acdfec221ea09ea5e763&append_to_response=credits&language=ar-SA`);
@@ -61,9 +58,7 @@ export default function WatchPage() {
     loadWork();
   }, [id]);
 
-  // دالة المشاهدة المربحة: تفتح رابط إعلاني في نافذة جديدة ثم تظهر المشغل
   const handleStartWatching = () => {
-    // فتح نافذة إعلانية جديدة (Pop-under Simulation / Smartlink)
     window.open("https://www.google.com", "_blank");
     setShowPlayer(true);
     setTimeout(() => {
@@ -91,24 +86,34 @@ export default function WatchPage() {
       <Navbar />
       <AdBanner type="top" />
 
-      {/* خلفية العمل والبوستر وتفاصيل البداية */}
-      <div className="relative w-full py-8 md:py-12 overflow-hidden border-b border-white/5">
-        <img 
-          src={getImg(media.backdrop_path, 'original')} 
-          alt="" 
-          className="absolute inset-0 w-full h-full object-cover opacity-20 filter blur-sm scale-105"
-        />
+      {/* خلفية العمل */}
+      <div className="relative w-full py-8 md:py-12 overflow-hidden border-b border-white/5 bg-[#0e0e12]">
+        <div className="absolute inset-0 overflow-hidden">
+          <img 
+            src={getImg(media.backdrop_path, 'original')} 
+            alt="" 
+            className="w-full h-full object-cover opacity-20 filter blur-sm scale-105"
+          />
+        </div>
         <div className="absolute inset-0 bg-gradient-to-t from-[#08080a] via-[#08080a]/80 to-transparent" />
 
         <div className="relative z-10 container mx-auto px-4">
           <div className="flex flex-col md:flex-row gap-6 md:gap-8 items-center md:items-start">
             
-            {/* البوستر بالحجم المتناسق */}
-            <div className="w-48 sm:w-56 flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-              <img src={getImg(media.poster_path)} alt={media.title} className="w-full h-auto object-cover" />
+            {/* البوستر مع ضمان عدم الانهيار */}
+            <div className="w-48 sm:w-56 flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-[#141419]">
+              <div className="poster-box">
+                <img 
+                  src={getImg(media.poster_path)} 
+                  alt={media.title}
+                  onError={(e) => {
+                    e.currentTarget.src = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=500&auto=format&fit=crop&q=60";
+                  }}
+                />
+              </div>
             </div>
 
-            {/* تفاصيل العمل وأزرار المشاهدة */}
+            {/* التفاصيل */}
             <div className="flex-1 text-center md:text-right">
               <div className="flex flex-wrap justify-center md:justify-start items-center gap-2 mb-3">
                 <span className="bg-red-600 text-white font-bold text-xs px-2 py-0.5 rounded">WEB-DL</span>
@@ -137,7 +142,6 @@ export default function WatchPage() {
                 {media.overview || 'لا يوجد ملخص متاح حالياً لهذا العمل، يمكنك الاستمتاع بمشاهدته بجودة عالية فوراً.'}
               </p>
 
-              {/* أزرار المشاهدة والتحميل */}
               <div className="flex flex-wrap justify-center md:justify-start gap-3">
                 <button 
                   onClick={handleStartWatching}
@@ -159,7 +163,7 @@ export default function WatchPage() {
 
       <div className="container mx-auto px-4 py-8">
         
-        {/* شاشة العرض (مشغل الفيديو) يظهر عند الضغط */}
+        {/* المشغل */}
         {showPlayer && (
           <div id="player-screen" className="mb-12 scroll-mt-20">
             <div className="flex items-center justify-between mb-3">
@@ -190,7 +194,7 @@ export default function WatchPage() {
           </div>
         )}
 
-        {/* إذا كان العمل مسلسلاً: عرض الحلقات في هيئة مربعات مصغرة بالصور */}
+        {/* الحلقات في شكل مربعات بصور ثابتة الأبعاد */}
         {!isMovie && (
           <div className="mb-12">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
@@ -209,17 +213,17 @@ export default function WatchPage() {
                     }}
                     className={`group text-right rounded-xl overflow-hidden border transition-all ${isCurrent ? 'border-red-600 bg-red-600/10' : 'border-white/5 bg-[#121216] hover:border-red-600/50'}`}
                   >
-                    <div className="relative aspect-video overflow-hidden bg-black/60">
+                    <div className="episode-box">
                       <img 
                         src={getImg(ep.image || media.backdrop_path)} 
                         alt={ep.title} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300" 
+                        className="transition-transform duration-300 group-hover:scale-105"
                       />
                       <div className="absolute inset-0 bg-black/40 group-hover:bg-transparent transition" />
-                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
-                        <Play size={20} fill="currentColor" className="text-white bg-red-600 p-1 rounded-full" />
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition z-10">
+                        <Play size={20} fill="currentColor" className="text-white bg-red-600 p-1 rounded-full shadow" />
                       </div>
-                      <span className="absolute bottom-1 right-1 bg-black/70 text-[10px] px-1.5 py-0.5 rounded text-white font-bold">
+                      <span className="absolute bottom-1 right-1 bg-black/80 text-[10px] px-1.5 py-0.5 rounded text-white font-bold z-10">
                         حلقة {ep.episode_number}
                       </span>
                     </div>
@@ -234,7 +238,7 @@ export default function WatchPage() {
           </div>
         )}
 
-        {/* طاقم العمل والإعلانات الجانبية */}
+        {/* الممثلين والإعلانات */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-8">
             {tmdbData?.credits?.cast && (
@@ -245,11 +249,13 @@ export default function WatchPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {tmdbData.credits.cast.slice(0, 8).map((actor: any) => (
                     <div key={actor.id} className="bg-white/5 border border-white/5 p-2 rounded-xl flex items-center gap-2.5">
-                      <img 
-                        src={getImg(actor.profile_path)} 
-                        alt={actor.name} 
-                        className="w-10 h-10 rounded-full object-cover border border-red-600/40" 
-                      />
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden flex-shrink-0 border border-red-600/40 bg-zinc-800">
+                        <img 
+                          src={getImg(actor.profile_path)} 
+                          alt={actor.name} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
                       <div className="overflow-hidden">
                         <p className="text-xs font-bold text-white truncate">{actor.name}</p>
                         <p className="text-[10px] text-gray-400 truncate">{actor.character}</p>
@@ -260,7 +266,7 @@ export default function WatchPage() {
               </div>
             )}
 
-            {/* روابط التحميل المباشر */}
+            {/* التحميل */}
             <div id="downloads" className="bg-[#121216] border border-white/5 p-6 rounded-2xl">
               <h3 className="text-lg font-bold mb-4 flex items-center gap-2 border-r-4 border-red-600 pr-3">
                 <Download size={18} className="text-red-600" /> روابط التحميل المباشر
@@ -303,14 +309,13 @@ export default function WatchPage() {
             </div>
           </div>
 
-          {/* عمود إعلاني جانبي */}
           <aside className="space-y-6">
             <AdBanner type="rectangle" />
             <div className="bg-[#121216] border border-white/5 p-4 rounded-xl text-xs space-y-2 text-gray-400">
               <div className="flex items-center gap-2 text-green-400 font-bold mb-1">
-                <ShieldCheck size={16} /> سيرفرات آمنة ومحدثة
+                <ShieldCheck size={16} /> سيرفرات آمنة وسريعة
               </div>
-              <p>إذا واجهت بطئاً في المشغل أو لم يعمل، جرب التبديل بين السيرفرات بالأعلى أو إعادة تحميل الصفحة.</p>
+              <p>إذا واجهت أي تقطيع أثناء المشاهدة، قم بالتبديل بين السيرفرات المتاحة بالأعلى.</p>
             </div>
           </aside>
         </div>
