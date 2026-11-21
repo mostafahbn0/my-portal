@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { 
-  Play, Download, Star, Layers, Sparkles, AlertCircle, CheckCircle2, ShieldCheck 
+  Play, Download, Star, Layers, Sparkles, AlertCircle, CheckCircle2, ShieldCheck, Globe
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -19,10 +19,10 @@ function WatchContent() {
   const [item, setItem] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // 5 Global Video Embed Servers
-  const [activeServer, setActiveServer] = useState<'superembed' | 'vidsrc' | 'vidlink' | 'autoembed' | 'embedsu'>('superembed');
+  // Servers
+  const [activeServer, setActiveServer] = useState<'arabic_direct' | 'superembed' | 'vidsrc' | 'vidlink' | 'embedsu'>('superembed');
 
-  // Series State
+  // Series
   const [isSeries, setIsSeries] = useState(false);
   const [seasons, setSeasons] = useState<any[]>([]);
   const [selectedSeason, setSelectedSeason] = useState(initialSeason);
@@ -30,7 +30,7 @@ function WatchContent() {
   const [selectedEpisode, setSelectedEpisode] = useState(initialEpisode);
   const [loadingEpisodes, setLoadingEpisodes] = useState(false);
 
-  // Monetization State
+  // Monetization
   const [hasTriggeredPreRoll, setHasTriggeredPreRoll] = useState(false);
   const [showDownloadModal, setShowDownloadModal] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -47,8 +47,13 @@ function WatchContent() {
       const { data } = await supabase.from('media').select('*').eq('id', id).single();
       if (data) {
         setItem(data);
-        const isTv = data.type === 'series' || data.type === 'tv' || data.media_type === 'series' || data.media_type === 'tv';
+        const isTv = data.type === 'series' || data.type === 'tv';
         setIsSeries(isTv);
+
+        // إذا كان العمل عربياً ولديه رابط فيديو مباشر مسحوب من عرب سيد/أكوام
+        if (data.video_url) {
+          setActiveServer('arabic_direct');
+        }
 
         if (isTv && data.tmdb_id) {
           fetchSeriesData(data.tmdb_id, initialSeason);
@@ -59,12 +64,11 @@ function WatchContent() {
     fetchMedia();
   }, [id]);
 
-  // Safe Non-blocking Episodes Fetcher
   async function fetchSeriesData(tmdbId: number, seasonNum: number) {
     setLoadingEpisodes(true);
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000); // 4 seconds max
+      const timeoutId = setTimeout(() => controller.abort(), 4000);
 
       const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?api_key=${TMDB_KEY}&language=ar-SA`, { signal: controller.signal });
       clearTimeout(timeoutId);
@@ -77,10 +81,8 @@ function WatchContent() {
         setSeasons([{ season_number: 1, name: 'الموسم 1' }]);
       }
 
-      // Fetch Episodes
       fetchSeasonEpisodes(tmdbId, seasonNum);
     } catch {
-      // Fallback: Never hang!
       setSeasons([{ season_number: 1, name: 'الموسم 1' }]);
       setEpisodes(Array.from({ length: 24 }, (_, i) => ({ episode_number: i + 1, name: `الحلقة ${i + 1}` })));
       setLoadingEpisodes(false);
@@ -104,9 +106,14 @@ function WatchContent() {
     }
   }
 
-  // 5 Universal Multi-Server URLs
   const getEmbedUrl = () => {
-    if (!item?.tmdb_id) return '';
+    // 1. الأولوية الأولى: لو الفيلم عربي وله سيرفر مباشر من عرب سيد أو أكوام
+    if (activeServer === 'arabic_direct' && item?.video_url) {
+      return item.video_url;
+    }
+
+    // 2. السيرفرات العالمية لباقي الأفلام والمسلسلات والأنمي
+    if (!item?.tmdb_id) return item?.video_url || '';
     const tmdbId = item.tmdb_id;
     const s = Number(selectedSeason) || 1;
     const e = Number(selectedEpisode) || 1;
@@ -119,10 +126,10 @@ function WatchContent() {
           return `https://vidsrc.pro/embed/tv/${tmdbId}/${s}/${e}`;
         case 'vidlink':
           return `https://vidlink.pro/tv/${tmdbId}/${s}/${e}?sub.ar=true&primaryColor=dc2626`;
-        case 'autoembed':
-          return `https://player.autoembed.cc/embed/tv/${tmdbId}/${s}/${e}`;
         case 'embedsu':
           return `https://embed.su/embed/tv/${tmdbId}/${s}/${e}`;
+        default:
+          return `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1&s=${s}&e=${e}`;
       }
     } else {
       switch (activeServer) {
@@ -132,15 +139,14 @@ function WatchContent() {
           return `https://vidsrc.pro/embed/movie/${tmdbId}`;
         case 'vidlink':
           return `https://vidlink.pro/movie/${tmdbId}?sub.ar=true&primaryColor=dc2626`;
-        case 'autoembed':
-          return `https://player.autoembed.cc/embed/movie/${tmdbId}`;
         case 'embedsu':
           return `https://embed.su/embed/movie/${tmdbId}`;
+        default:
+          return `https://multiembed.mov/?video_id=${tmdbId}&tmdb=1`;
       }
     }
   };
 
-  // High CPM Pre-Roll Ad Trigger
   const handlePlayerClick = () => {
     if (!hasTriggeredPreRoll) {
       window.open(DIRECT_AD_LINK, '_blank');
@@ -148,7 +154,6 @@ function WatchContent() {
     }
   };
 
-  // Download Trigger
   const handleDownload = () => {
     window.open(DIRECT_AD_LINK, '_blank');
     setCountdown(5);
@@ -192,13 +197,13 @@ function WatchContent() {
         <div className="mb-4">
           <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs font-black">
-              {isSeries ? `الموسم ${selectedSeason} - الحلقة ${selectedEpisode}` : 'فيلم سينمائي 4K'}
+              {item.video_url ? 'سيرفر عربي VIP 🇪🇬' : isSeries ? `الموسم ${selectedSeason} - الحلقة ${selectedEpisode}` : 'فيلم سينمائي 4K'}
             </span>
             <span className="px-2.5 py-1 bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 rounded-lg text-xs font-bold">
               ⭐ {item.vote_average ? Number(item.vote_average).toFixed(1) : '8.6'}
             </span>
             <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-bold flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" /> مترجم للعربية
+              <ShieldCheck className="w-3.5 h-3.5" /> جودة أصلية فائقة
             </span>
           </div>
           <h1 className="text-xl sm:text-3xl font-black">{item.title}</h1>
@@ -206,8 +211,6 @@ function WatchContent() {
 
         {/* Video Player Frame */}
         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden shadow-2xl border border-white/10">
-          
-          {/* High-CPM Simulated Pre-Roll Click */}
           {!hasTriggeredPreRoll && (
             <div 
               onClick={handlePlayerClick}
@@ -231,17 +234,31 @@ function WatchContent() {
           />
         </div>
 
-        {/* 5 Multi-Server VIP Switcher */}
+        {/* Multi-Server VIP Switcher */}
         <div className="mt-4 p-4 bg-[#111116] border border-white/5 rounded-2xl">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs text-gray-400 font-bold ml-1">اختر السيرفر:</span>
+              
+              {item.video_url && (
+                <button
+                  onClick={() => setActiveServer('arabic_direct')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 ${
+                    activeServer === 'arabic_direct'
+                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                      : 'bg-white/5 text-gray-400 hover:bg-white/10'
+                  }`}
+                >
+                  <Globe className="w-3.5 h-3.5" />
+                  <span>السيرفر العربي المباشر 🇪🇬</span>
+                </button>
+              )}
+
               {[
-                { id: 'superembed', name: 'سيرفر VIP 1 (الأساسي العالمي)' },
-                { id: 'vidsrc', name: 'سيرفر VIP 2 (سريع جداً)' },
+                { id: 'superembed', name: 'سيرفر VIP 1 (الأساسي)' },
+                { id: 'vidsrc', name: 'سيرفر VIP 2 (سريع)' },
                 { id: 'vidlink', name: 'سيرفر VIP 3 (سحابي)' },
-                { id: 'autoembed', name: 'سيرفر VIP 4 (بديل)' },
-                { id: 'embedsu', name: 'سيرفر VIP 5 (احتياطي)' },
+                { id: 'embedsu', name: 'سيرفر VIP 4 (بديل)' },
               ].map((srv) => (
                 <button
                   key={srv.id}
@@ -265,20 +282,15 @@ function WatchContent() {
               <span>تحميل العمل</span>
             </button>
           </div>
-
-          <div className="mt-3 pt-3 border-t border-white/5 flex items-center gap-2 text-[11px] text-yellow-500/90">
-            <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-            <span>إذا واجهت أي بطء أو رسالة في السيرفر، بدل بين السيرفرات (VIP 1 أو VIP 2) وسيعمل معك فوراً بأعلى سرعة وترجمة.</span>
-          </div>
         </div>
 
-        {/* TV Series / Anime Episodes Browser */}
+        {/* TV Series Episodes */}
         {isSeries && (
           <div className="mt-8 bg-[#111116] border border-white/10 rounded-3xl p-5 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-white/5">
               <h3 className="text-base font-black flex items-center gap-2">
                 <Layers className="text-red-500 w-5 h-5" />
-                <span>قائمة الحلقات والمواسم</span>
+                <span>قائمة الحلقات</span>
               </h3>
 
               {seasons.length > 0 && (
@@ -332,32 +344,20 @@ function WatchContent() {
       {showDownloadModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4">
           <div className="bg-[#121218] border border-white/10 rounded-3xl p-6 max-w-sm w-full text-center relative">
-            <button 
-              onClick={() => setShowDownloadModal(false)}
-              className="absolute top-4 left-4 text-gray-400 hover:text-white"
-            >
-              ✕
-            </button>
+            <button onClick={() => setShowDownloadModal(false)} className="absolute top-4 left-4 text-gray-400 hover:text-white">✕</button>
             <Download className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
             <h3 className="text-lg font-black mb-1">تحميل: {item.title}</h3>
-            <p className="text-xs text-gray-400 mb-6">جودة 1080p Full HD الأصلية</p>
-
+            <p className="text-xs text-gray-400 mb-6">جودة 1080p الأصلية</p>
             {countdown !== null && countdown > 0 && (
               <div className="py-4 bg-white/5 rounded-2xl border border-white/5">
-                <p className="text-xs text-gray-400 mb-2">جاري تجهيز رابط التحميل المباشر...</p>
+                <p className="text-xs text-gray-400 mb-2">جاري تجهيز السيرفر المباشر...</p>
                 <span className="text-3xl font-black text-emerald-400 font-mono">{countdown}s</span>
               </div>
             )}
-
             {downloadReady && (
-              <a
-                href={DIRECT_AD_LINK}
-                target="_blank"
-                rel="noreferrer"
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2 transition"
-              >
+              <a href={DIRECT_AD_LINK} target="_blank" rel="noreferrer" className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs rounded-xl flex items-center justify-center gap-2 transition">
                 <CheckCircle2 className="w-4 h-4" />
-                <span>اضغط هنا لبدء التحميل المباشر الآن</span>
+                <span>اضغط هنا لبدء التحميل الآن</span>
               </a>
             )}
           </div>
@@ -370,7 +370,7 @@ function WatchContent() {
 
 export default function WatchPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#08080a] flex items-center justify-center text-white text-xs">جاري تجهيز السيرفرات...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#08080a] flex items-center justify-center text-white text-xs">جاري تجهيز المشغل...</div>}>
       <WatchContent />
     </Suspense>
   );
