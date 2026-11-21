@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { 
   Play, Download, Server, ArrowRight, Star, 
   Calendar, ShieldCheck, Film, Tv, Sparkles, 
-  Clock, Globe, Layers, ArrowLeft
+  Clock, Globe, Layers, ArrowLeft, Subtitles, CheckCircle2
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -15,15 +15,17 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjZ3dmbmV2cW9vd2VyamV5aGdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDc3NzMsImV4cCI6MjA1MjM4Mzc3M30.b8nF7R4w04iT3vjXU8p2kM7aV8xG7g4_6Xb0fXqI3Xv'
 );
 
+const TMDB_API_KEY = "204ce203e280acdfec221ea09ea5e763";
 const DIRECT_AD_LINK = 'https://uplcm.com/4/12311730';
 
 export default function WatchPage() {
   const { id } = useParams();
 
   const [media, setMedia] = useState<any>(null);
+  const [imdbId, setImdbId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeServerUrl, setActiveServerUrl] = useState<string>('');
-  const [activeServerName, setActiveServerName] = useState<string>('سيرفر VIP 1 (الترجمة العربية)');
+  const [activeServerName, setActiveServerName] = useState<string>('سيرفر VIP 1 (مترجم عربي تلقائي)');
   const [isUnlocked, setIsUnlocked] = useState(false);
 
   // إعدادات المسلسلات
@@ -33,41 +35,48 @@ export default function WatchPage() {
   const [selectedEpisode, setSelectedEpisode] = useState(1);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadWatchData() {
       if (!id) return;
       setLoading(true);
 
-      const { data } = await supabase.from('media').select('*').eq('id', id).single();
-      if (data) {
-        setMedia(data);
-        if (data.media_type === 'tv') {
-          fetchSeriesSeasons(data.id);
+      // 1. جلب من Supabase
+      const { data: dbData } = await supabase.from('media').select('*').eq('id', id).single();
+      setMedia(dbData);
+
+      const mediaType = dbData?.media_type || 'movie';
+
+      // 2. جلب معرف الـ IMDb ID لضمان الترجمة 100%
+      try {
+        const extUrl = `https://api.themoviedb.org/3/${mediaType}/${id}?api_key=${TMDB_API_KEY}&append_to_response=external_ids`;
+        const res = await fetch(extUrl);
+        const extData = await res.json();
+        
+        const extractedImdb = extData?.external_ids?.imdb_id || extData?.imdb_id;
+        if (extractedImdb) {
+          setImdbId(extractedImdb);
         }
+
+        if (mediaType === 'tv') {
+          const validSeasons = extData?.seasons?.filter((s: any) => s.season_number > 0) || [];
+          setSeasons(validSeasons);
+          if (validSeasons.length > 0) {
+            loadEpisodes(id, validSeasons[0].season_number);
+          }
+        }
+      } catch (err) {
+        console.error("IMDb Fetch error:", err);
       }
+
       setLoading(false);
     }
 
-    loadData();
+    loadWatchData();
   }, [id]);
-
-  async function fetchSeriesSeasons(tvId: any) {
-    try {
-      const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}?api_key=204ce203e280acdfec221ea09ea5e763&language=ar`);
-      const data = await res.json();
-      if (data.seasons && data.seasons.length > 0) {
-        const valid = data.seasons.filter((s: any) => s.season_number > 0);
-        setSeasons(valid);
-        loadEpisodes(tvId, valid[0]?.season_number || 1);
-      }
-    } catch {
-      setEpisodes(Array.from({ length: 24 }, (_, i) => ({ episode_number: i + 1 })));
-    }
-  }
 
   async function loadEpisodes(tvId: any, sNum: number) {
     setSelectedSeason(sNum);
     try {
-      const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${sNum}?api_key=204ce203e280acdfec221ea09ea5e763&language=ar`);
+      const res = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${sNum}?api_key=${TMDB_API_KEY}&language=ar`);
       const data = await res.json();
       setEpisodes(data.episodes || Array.from({ length: 20 }, (_, i) => ({ episode_number: i + 1 })));
     } catch {
@@ -77,44 +86,52 @@ export default function WatchPage() {
 
   const isTv = media?.media_type === 'tv';
   const targetId = media?.id || id;
+  const targetImdb = imdbId || targetId;
 
-  // سيرفرات VIP مجهزة بفرض الترجمة العربية
+  // ترسانة السيرفرات الذكية مع فرض الترجمة العربية التلقائية
   const servers = [
     {
-      name: 'سيرفر VIP 1 (VidLink - ترجمة عربية تلقائية)',
+      name: 'سيرفر VIP 1 (VidLink Pro - ترجمة عربية تلقائية)',
       url: isTv 
-        ? `https://vidlink.pro/tv/${targetId}/${selectedSeason}/${selectedEpisode}?sub.ar=true&primaryColor=dc2626`
-        : `https://vidlink.pro/movie/${targetId}?sub.ar=true&primaryColor=dc2626`
+        ? `https://vidlink.pro/tv/${targetId}/${selectedSeason}/${selectedEpisode}?sub.ar=true&sub_default=ar&sub_lang=ar&primaryColor=dc2626`
+        : `https://vidlink.pro/movie/${targetId}?sub.ar=true&sub_default=ar&sub_lang=ar&primaryColor=dc2626`
     },
     {
-      name: 'سيرفر VIP 2 (SuperEmbed - جودة عالية)',
+      name: 'سيرفر VIP 2 (SuperEmbed - متعدد الترجمات بدعم IMDb)',
       url: isTv 
-        ? `https://multiembed.mov/?video_id=${targetId}&tmdb=1&s=${selectedSeason}&e=${selectedEpisode}`
-        : `https://multiembed.mov/?video_id=${targetId}&tmdb=1`
+        ? `https://multiembed.mov/?video_id=${targetImdb}&tmdb=1&s=${selectedSeason}&e=${selectedEpisode}`
+        : `https://multiembed.mov/?video_id=${targetImdb}&tmdb=1`
     },
     {
-      name: 'سيرفر VIP 3 (EmbedSu - ترجمات متعددة)',
+      name: 'سيرفر VIP 3 (AutoEmbed VIP - لغة عربية مدمجة)',
+      url: isTv 
+        ? `https://player.autoembed.cc/embed/tv/${targetId}/${selectedSeason}/${selectedEpisode}?sub_lang=ar&default_sub=ar`
+        : `https://player.autoembed.cc/embed/movie/${targetId}?sub_lang=ar&default_sub=ar`
+    },
+    {
+      name: 'سيرفر VIP 4 (EmbedSu - جودة 1080p فائقة)',
       url: isTv 
         ? `https://embed.su/embed/tv/${targetId}/${selectedSeason}/${selectedEpisode}`
         : `https://embed.su/embed/movie/${targetId}`
     },
     {
-      name: 'سيرفر VIP 4 (VidSrc Pro)',
+      name: 'سيرفر VIP 5 (VidSrc Pro)',
       url: isTv 
         ? `https://vidsrc.pro/embed/tv/${targetId}/${selectedSeason}/${selectedEpisode}`
-        : `https://vidsrc.pro/embed/movie/${targetId}`
+        : (imdbId ? `https://vidsrc.pro/embed/movie/${imdbId}` : `https://vidsrc.pro/embed/movie/${targetId}`)
     },
     {
-      name: 'سيرفر VIP 5 (AutoEmbed)',
+      name: 'سيرفر VIP 6 (VidSrc CC)',
       url: isTv 
-        ? `https://player.autoembed.cc/embed/tv/${targetId}/${selectedSeason}/${selectedEpisode}`
-        : `https://player.autoembed.cc/embed/movie/${targetId}`
+        ? `https://vidsrc.cc/v2/embed/tv/${targetId}/${selectedSeason}/${selectedEpisode}`
+        : `https://vidsrc.cc/v2/embed/movie/${targetId}`
     }
   ];
 
+  // إذا كان هناك سيرفر عربي أصلي مرفوع
   if (media?.video_url) {
     servers.unshift({
-      name: '⚡ سيرفر المصدر الأصلي (مترجم مدمج)',
+      name: '⚡ سيرفر المصدر الأصلي (ترجمة مدمجة Hardsub)',
       url: media.video_url
     });
   }
@@ -131,7 +148,10 @@ export default function WatchPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-[#08080a] flex items-center justify-center text-white">
-        <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-12 h-12 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="text-zinc-400 text-sm font-semibold animate-pulse">جاري تحضير سيرفرات الترجمة العربية...</span>
+        </div>
       </div>
     );
   }
@@ -151,8 +171,13 @@ export default function WatchPage() {
           </Link>
 
           <div className="flex items-center gap-2">
+            {imdbId && (
+              <span className="px-2.5 py-1 bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-xs font-bold rounded-md">
+                IMDb: {imdbId}
+              </span>
+            )}
             <span className="px-3 py-1 bg-red-600/20 text-red-500 border border-red-500/30 text-xs font-bold rounded-full">
-              {isTv ? 'مسلسل تلفزيوني' : 'فيلم سينمائي'}
+              {isTv ? 'مسلسل VIP' : 'فيلم سينمائي'}
             </span>
           </div>
         </div>
@@ -180,10 +205,10 @@ export default function WatchPage() {
                   <Play className="w-10 h-10 fill-white translate-x-1" />
                 </div>
                 <h3 className="text-xl md:text-2xl font-black text-white">انقر لبدء المشاهدة بأعلى جودة</h3>
-                <p className="text-sm text-zinc-400">سيرفرات تدعم الترجمة العربية التلقائية بجودة 1080p</p>
+                <p className="text-sm text-zinc-400">سيرفرات فائقة السرعة مع ترجمة عربية مدمجة</p>
                 <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 px-4 py-1.5 rounded-full text-xs text-green-400">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>سيرفرات آمنة وبدون تقطيع</span>
+                  <span>سيرفرات آمنة 1080p بدون تقطيع</span>
                 </div>
               </div>
             </div>
@@ -206,12 +231,15 @@ export default function WatchPage() {
               <Server className="w-4 h-4 text-red-500" />
               <span>السيرفر الحالي: <span className="text-red-400">{activeServerName}</span></span>
             </div>
-            <span className="text-amber-400 text-xs bg-amber-400/10 border border-amber-400/20 px-3 py-1 rounded-full flex items-center gap-1.5">
-              <span>💡 لتشغيل الترجمة أو تعديل الخط: انقر على أيقونة [CC] داخل شاشة الفيديو واختر Arabic</span>
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-emerald-400 text-xs bg-emerald-400/10 border border-emerald-400/20 px-3 py-1 rounded-full flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>الترجمة العربية مفعلة تلقائياً</span>
+              </span>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
             {servers.map((srv, idx) => (
               <button
                 key={idx}
@@ -240,7 +268,7 @@ export default function WatchPage() {
               <div>
                 <span className="text-xs text-zinc-400 font-bold block mb-2 flex items-center gap-1.5">
                   <Layers className="w-4 h-4 text-red-500" />
-                  المواسم:
+                  المواسم المتاحة:
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {seasons.map((s) => (
@@ -263,7 +291,7 @@ export default function WatchPage() {
             <div>
               <span className="text-xs text-zinc-400 font-bold block mb-2 flex items-center gap-1.5">
                 <Tv className="w-4 h-4 text-red-500" />
-                الحلقات:
+                الحلقات ({episodes.length} حلقة):
               </span>
               <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-2 max-h-56 overflow-y-auto pr-1">
                 {episodes.map((ep) => (
