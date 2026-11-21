@@ -1,16 +1,21 @@
-import type { Metadata } from "next";
-import { Cairo } from "next/font/google";
-import "./globals.css";
+import type { Metadata } from 'next';
+import { Tajawal } from 'next/font/google';
+import './globals.css';
+import Navbar from '@/components/Navbar';
 
-const cairo = Cairo({ 
-  subsets: ["arabic"],
-  weight: ['200', '300', '400', '500', '600', '700', '800', '900'],
-  display: 'swap',
+const tajawal = Tajawal({
+  subsets: ['arabic'],
+  weight: ['300', '400', '500', '700', '900'],
+  variable: '--font-tajawal',
 });
 
 export const metadata: Metadata = {
-  title: "سينما بلاس | مشاهدة أحدث الأفلام والمسلسلات مترجمة",
-  description: "المنصة العربية الأولى لمشاهدة وتحميل الأفلام والمسلسلات العربية والأجنبية والأنمي بجودة 4K فائقة وترجمة معتمدة.",
+  title: 'سينما بلاس | Cinema Plus - مشاهدة وتحميل أفلام ومسلسلات مترجمة مجاناً',
+  description: 'منصة سينما بلاس الأولى عربياً لمشاهدة أحدث أفلام هوليوود، مسلسلات نيتفلكس، والأنمي المترجم بجودة عالية 1080p و 4K بدون تقطيع.',
+  metadataBase: new URL('https://my-portal-nu-liart.vercel.app'),
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
@@ -19,21 +24,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl" className="dark">
+    <html lang="ar" dir="rtl" className={tajawal.variable}>
       <head>
+        {/* حماية وتشفير تلقائي لتفادي تحذيرات المتصفحات */}
+        <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+        {/* إثبات ملكية Monetag الآمن */}
         <meta name="monetag" content="3e81a1f47455d827e8622e53ef6a6ed9" />
-        <meta name="referrer" content="no-referrer" />
-        
-        {/* إعلانات الأرباح النظيفة فقط (Vignette + MultiTag الأساسي) - بدون أي رسائل جانبية مشوهة */}
-        <script src="https://quge5.com/88/tag.min.js" data-zone="313132" async data-cfasync="false"></script>
-        <script src="https://5gvci.com/act/files/tag.min.js?z=12311722" data-cfasync="false" async></script>
-        
-        <script dangerouslySetInnerHTML={{ __html: `
-          (function(s){s.dataset.zone='12311724',s.src='https://n6wxm.com/vignette.min.js'})([document.documentElement, document.body].filter(Boolean).pop().appendChild(document.createElement('script')))
-        `}} />
       </head>
-      <body className={`${cairo.className} bg-[#08080a] text-white selection:bg-red-600/30 selection:text-red-500 overflow-x-hidden`}>
-        {children}
+      <body className="bg-[#08080a] text-white font-sans antialiased min-h-screen selection:bg-red-600 selection:text-white">
+        <Navbar />
+        <main>{children}</main>
       </body>
     </html>
   );

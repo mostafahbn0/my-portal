@@ -1,94 +1,123 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Film, Tv, Flame, Shuffle, MessageSquarePlus, X, Star } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { getMediaPoster, getMediaYear, getMediaRating } from '@/lib/utils';
+import { Search, Film, Tv, Menu, X, Sparkles, Popcorn, Flame } from 'lucide-react';
 
 export default function Navbar() {
-  const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
-  const searchRef = useRef<HTMLDivElement>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
+  const router = useRouter();
 
-  // رابط الربح المباشر من موني تاج
-  const monetagDirectLink = "https://uplcm.com/4/12311730";
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setIsOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  useEffect(() => {
-    const timer = setTimeout(async () => {
-      const q = searchQuery.trim();
-      if (q.length >= 1) {
-        setLoading(true);
-        const { data } = await supabase.from('media').select('*').ilike('title', `%${q}%`).limit(8);
-        setResults(data || []);
-        setIsOpen(true);
-        setLoading(false);
-      } else {
-        setResults([]); setIsOpen(false);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [searchQuery]);
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setShowMobileSearch(false);
+      setIsOpen(false);
+    }
+  };
 
   return (
-    <header className="sticky top-0 z-50 bg-[#08080a]/95 backdrop-blur-md border-b border-white/5">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        <Link href="/" className="text-2xl font-black bg-gradient-to-r from-red-600 to-amber-500 bg-clip-text text-transparent">
-          سينما بلاس
-        </Link>
-
-        <div ref={searchRef} className="relative flex-1 max-w-md">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && router.push(`/explore?q=${searchQuery}`)}
-            placeholder="ابحث عن الأفلام والمسلسلات..."
-            className="w-full bg-[#121318] text-white text-sm rounded-full px-10 py-2 border border-white/10 focus:border-red-600 focus:outline-none"
-          />
-          <Search className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+    <nav className="sticky top-0 z-50 bg-[#08080a]/95 backdrop-blur-md border-b border-white/5" dir="rtl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="flex items-center justify-between h-16">
           
-          {isOpen && (
-            <div className="absolute top-full left-0 right-0 mt-2 bg-[#121318] border border-white/10 rounded-xl overflow-hidden shadow-2xl z-50">
-              {results.length > 0 ? results.map((item) => (
-                <Link key={item.id} href={`/watch/${item.id}`} onClick={() => setIsOpen(false)} className="flex items-center gap-3 p-2 hover:bg-white/5 transition-colors group">
-                  <img src={getMediaPoster(item)} className="w-8 h-12 object-cover rounded" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-white truncate group-hover:text-red-500" dir="ltr" style={{textAlign:'right'}}>{item.title}</p>
-                  </div>
-                </Link>
-              )) : <div className="p-4 text-center text-xs text-gray-400">لا توجد نتائج</div>}
-            </div>
-          )}
+          {/* Logo */}
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-2 group">
+              <div className="w-9 h-9 bg-red-600 rounded-xl flex items-center justify-center text-white font-black shadow-lg shadow-red-600/40 group-hover:scale-105 transition">
+                ▶
+              </div>
+              <span className="text-xl font-black text-white tracking-wide">
+                سينما <span className="text-red-500">بلاس</span>
+              </span>
+            </Link>
+          </div>
+
+          {/* Desktop Search Bar */}
+          <div className="hidden md:flex flex-1 max-w-md mx-8">
+            <form onSubmit={handleSearch} className="w-full relative">
+              <input
+                type="text"
+                placeholder="ابحث عن فيلم، مسلسل، أو أنمي..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-[#121218] border border-white/10 rounded-2xl py-2 pr-10 pl-4 text-xs font-medium text-white placeholder-gray-400 focus:outline-none focus:border-red-600 transition"
+              />
+              <Search className="w-4 h-4 text-gray-400 absolute right-3.5 top-2.5" />
+            </form>
+          </div>
+
+          {/* Desktop Links */}
+          <div className="hidden md:flex items-center gap-4">
+            <Link href="/" className="text-xs font-bold text-gray-300 hover:text-white transition">الرئيسية</Link>
+            <a href="https://uplcm.com/4/12311730" target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold text-yellow-400 transition">
+              <Popcorn className="w-3.5 h-3.5 text-yellow-500" />
+              <span>فشار الحظ</span>
+            </a>
+          </div>
+
+          {/* Mobile Right Controls */}
+          <div className="flex items-center gap-2 md:hidden">
+            <button
+              onClick={() => setShowMobileSearch(!showMobileSearch)}
+              className="p-2 text-gray-300 hover:text-white bg-white/5 rounded-xl border border-white/5"
+            >
+              <Search className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className="p-2 text-gray-300 hover:text-white bg-white/5 rounded-xl border border-white/5"
+            >
+              {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            </button>
+          </div>
+
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* زر فشار الحظ المربح (يفتح إعلان في نافذة جديدة) */}
-          <a 
-            href={monetagDirectLink} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 bg-white/5 hover:bg-red-600/20 text-gray-300 px-3 py-1.5 rounded-full text-xs font-semibold border border-white/5"
-          >
-            <Shuffle className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">فشار الحظ</span>
-          </a>
+        {/* Mobile Search Dropdown */}
+        {showMobileSearch && (
+          <div className="md:hidden py-3 border-t border-white/5 animate-fade-in">
+            <form onSubmit={handleSearch} className="relative">
+              <input
+                type="text"
+                placeholder="اكتب اسم الفيلم أو المسلسل..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                autoFocus
+                className="w-full bg-[#121218] border border-red-600 rounded-xl py-2.5 pr-10 pl-4 text-xs text-white focus:outline-none"
+              />
+              <Search className="w-4 h-4 text-red-500 absolute right-3.5 top-3" />
+            </form>
+          </div>
+        )}
 
-          <button onClick={() => router.push('/explore')} className="bg-red-600 text-white px-4 py-1.5 rounded-full text-xs font-bold">استكشف</button>
-        </div>
+        {/* Mobile Navigation Drawer */}
+        {isOpen && (
+          <div className="md:hidden py-4 border-t border-white/5 space-y-2">
+            <Link
+              href="/"
+              onClick={() => setIsOpen(false)}
+              className="block px-4 py-2 text-xs font-bold text-gray-200 hover:bg-white/5 rounded-xl"
+            >
+              🏠 الرئيسية
+            </Link>
+            <a
+              href="https://uplcm.com/4/12311730"
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between px-4 py-2 text-xs font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 rounded-xl"
+            >
+              <span>🍿 فشار الحظ (فيلم عشوائي)</span>
+              <span className="text-[10px] bg-yellow-500/20 px-2 py-0.5 rounded">VIP</span>
+            </a>
+          </div>
+        )}
+
       </div>
-    </header>
+    </nav>
   );
 }
