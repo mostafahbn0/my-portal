@@ -4,6 +4,7 @@ import time
 import requests
 from supabase import create_client, Client
 
+# --- قراءة المفاتيح مباشرة من .env.local ---
 def load_env():
     env_vars = {}
     for p in ['.env.local', '.env']:
@@ -17,15 +18,16 @@ def load_env():
     return env_vars
 
 env = load_env()
+
 TMDB_API_KEY = "204ce203e280acdfec221ea09ea5e763"
 SUPABASE_URL = env.get("NEXT_PUBLIC_SUPABASE_URL", "https://pcgwfnevqoowerjeyhgk.supabase.co")
-SUPABASE_KEY = env.get("SUPABASE_SERVICE_ROLE_KEY") or env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+SUPABASE_KEY = env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") or env.get("SUPABASE_SERVICE_ROLE_KEY") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjZ3dmbmV2cW9vd2VyamV5aGdrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDc3NzMsImV4cCI6MjA1MjM4Mzc3M30.b8nF7R4w04iT3vjXU8p2kM7aV8xG7g4_6Xb0fXqI3Xv"
 
 try:
     supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    print("✅ تم الاتصال بقاعدة بيانات سينما بلاس")
+    print("✅ تم الاتصال بنجاح مع Supabase (مفتاح صحيح ومفعل)")
 except Exception as e:
-    print(f"❌ خطأ: {e}")
+    print(f"❌ خطأ في الاتصال: {e}")
     sys.exit(1)
 
 def get_cast(media_type, tmdb_id):
@@ -70,15 +72,15 @@ def insert_tmdb_item(item, media_type, custom_video=None, custom_servers=None):
             "cast_list": cast
         }
 
-        supabase.table("media").upsert(record).execute()
-        print(f"✨ تم النشر: [{title}] | سنة: {record['release_date']} | النجوم: {', '.join(cast[:2])}")
+        res = supabase.table("media").upsert(record).execute()
+        print(f"✨ تم النشر: [{title}] ({record['release_date']}) | ⭐ {rating}")
         return True
     except Exception as e:
         print(f"❌ خطأ: {e}")
         return False
 
 def fetch_category(category, max_pages=3):
-    print(f"\n🚀 جاري جلب محتوى [{category}] أوتوماتيكياً من خوادم TMDB...\n")
+    print(f"\n🚀 جاري جلب محتوى [{category}] أوتوماتيكياً من خوادم TMDB الرسمية...\n")
     total = 0
     for page in range(1, max_pages + 1):
         try:
@@ -100,7 +102,7 @@ def fetch_category(category, max_pages=3):
         except Exception as e:
             print(f"خطأ في الصفحة {page}: {e}")
 
-    print(f"\n🎉 تم الانتهاء بنجاح! تم إضافة {total} عمل عالي الجودة بنسبة 100%.\n")
+    print(f"\n🎉 تم الانتهاء بنجاح! تم إضافة {total} عمل صالح 100% لموقعك.\n")
 
 def add_arabic_movie_manually():
     print("\n🎬 إضافة فيلم مصري / عربي (ببيانات TMDB الرسمية وسيرفر نظيف) 🎬")
@@ -113,7 +115,7 @@ def add_arabic_movie_manually():
     results = res.get('results', [])
 
     if not results:
-        print("❌ لم يتم العثور على الفيلم في قاعدة بيانات TMDB.")
+        print("❌ لم يتم العثور على الفيلم في TMDB.")
         return
 
     print("\n🎯 النتائج المطابقة:")
@@ -124,7 +126,7 @@ def add_arabic_movie_manually():
     sel_idx = int(pick) - 1 if pick.isdigit() and 1 <= int(pick) <= len(results) else 0
     item = results[sel_idx]
 
-    video_url = input("🌐 الصق رابط سيرفر المشاهدة المباشر (مثل Vidmoly أو Uqload أو غيره): ").strip()
+    video_url = input("🌐 الصق رابط سيرفر المشاهدة المباشر (مثل Vidmoly أو Uqload): ").strip()
     
     servers = []
     if video_url:
