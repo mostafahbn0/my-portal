@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { 
   Play, Download, Server, ArrowRight, Star, 
-  Calendar, Layers, ShieldCheck, Film, Tv, Clock, Eye, Sparkles
+  Calendar, Layers, ShieldCheck, Film, Tv, Clock, Eye, Sparkles, Users
 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
@@ -24,7 +24,6 @@ export default function WatchPage() {
   const [activeServerUrl, setActiveServerUrl] = useState<string>('');
   const [activeServerName, setActiveServerName] = useState<string>('سيرفر VIP الأصلي');
   const [isUnlocked, setIsUnlocked] = useState(false);
-  const [sisterSeasons, setSisterSeasons] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadData() {
@@ -34,32 +33,7 @@ export default function WatchPage() {
       const { data } = await supabase.from('media').select('*').eq('id', id).single();
       if (data) {
         setMedia(data);
-        setActiveServerUrl(data.video_url || `https://vidsrc.to/embed/movie/${data.id}`);
-
-        // حفظ في Continue Watching
-        try {
-          const stored = JSON.parse(localStorage.getItem('cinema_continue') || '[]');
-          const filtered = stored.filter((item: any) => item.id !== data.id);
-          filtered.unshift({
-            id: data.id,
-            title: data.title,
-            poster: data.poster_path,
-            type: data.media_type,
-            date: new Date().toLocaleDateString('ar-EG')
-          });
-          localStorage.setItem('cinema_continue', JSON.stringify(filtered.slice(0, 10)));
-        } catch (e) {}
-
-        // البحث عن المواسم المرتبطة
-        if (data.parent_id || data.media_type === 'tv') {
-          const pId = data.parent_id || data.id;
-          const { data: seasons } = await supabase
-            .from('media')
-            .select('*')
-            .or(`parent_id.eq.${pId},id.eq.${pId}`)
-            .neq('id', data.id);
-          if (seasons) setSisterSeasons(seasons);
-        }
+        setActiveServerUrl(data.video_url || `https://multiembed.mov/?video_id=${data.id}&tmdb=1`);
       }
       setLoading(false);
     }
@@ -91,50 +65,41 @@ export default function WatchPage() {
     );
   }
 
-  // تجميع السيرفرات المتاحة
-  const serverList = [];
+  // تجميع السيرفرات مع السيرفرات البديلة
+  const serverList: any[] = [];
   if (media.video_servers && Array.isArray(media.video_servers) && media.video_servers.length > 0) {
     media.video_servers.forEach((s: any, idx: number) => {
-      serverList.push({ name: s.name || `سيرفر سينما ${idx + 1}`, url: s.url });
+      serverList.push({ name: s.name || `سيرفر عربي ${idx + 1}`, url: s.url });
     });
   } else if (media.video_url) {
-    serverList.push({ name: '⚡ سيرفر المصدر الأصلي (مترجم)', url: media.video_url });
+    serverList.push({ name: '⚡ سيرفر المصدر الأصلي', url: media.video_url });
   }
 
-  // سيرفرات VIP إضافية احتياطية
+  // سيرفرات VIP احتياطية تضمن عمل الفيلم دائماً
   serverList.push(
-    { name: 'سيرفر VIP 2 (VidSrc)', url: `https://vidsrc.to/embed/${media.media_type === 'tv' ? 'tv' : 'movie'}/${media.id}` },
-    { name: 'سيرفر VIP 3 (SuperEmbed)', url: `https://multiembed.mov/?video_id=${media.id}&tmdb=1` },
-    { name: 'سيرفر VIP 4 (AutoEmbed)', url: `https://player.autoembed.cc/embed/${media.media_type === 'tv' ? 'tv' : 'movie'}/${media.id}` }
+    { name: 'سيرفر VIP بديل 1 (SuperEmbed)', url: `https://multiembed.mov/?video_id=${media.id}&tmdb=1` },
+    { name: 'سيرفر VIP بديل 2 (VidSrc)', url: `https://vidsrc.to/embed/movie/${media.id}` },
+    { name: 'سيرفر VIP بديل 3 (AutoEmbed)', url: `https://player.autoembed.cc/embed/movie/${media.id}` }
   );
 
   return (
     <div className="min-h-screen bg-[#08080a] text-white pt-20 pb-16 px-4 md:px-8">
       <div className="max-w-7xl mx-auto space-y-6">
 
-        {/* رأس الصفحة */}
+        {/* زر العودة والرأس */}
         <div className="flex items-center justify-between">
           <Link href="/" className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition bg-zinc-900 px-4 py-2 rounded-lg border border-zinc-800 text-sm">
             <ArrowRight className="w-4 h-4" />
             <span>العودة للرئيسية</span>
           </Link>
-          <div className="flex items-center gap-2">
-            {media.season_number && media.media_type === 'tv' && (
-              <span className="px-3 py-1 bg-zinc-800 border border-zinc-700 text-xs font-bold rounded-full text-zinc-300">
-                الموسم {media.season_number}
-              </span>
-            )}
-            <span className="px-3 py-1 bg-red-600/20 text-red-500 border border-red-500/30 text-xs font-bold rounded-full">
-              {media.media_type === 'tv' ? 'مسلسل' : 'فيلم سينمائي'}
-            </span>
-          </div>
+          <span className="px-3 py-1 bg-red-600/20 text-red-500 border border-red-500/30 text-xs font-bold rounded-full">
+            {media.media_type === 'tv' ? 'مسلسل تلفزيوني' : 'فيلم سينمائي'}
+          </span>
         </div>
 
-        {/* مشغل سينما بلاس المطور */}
+        {/* مشغل الفيديو مع كسر حظر الدومين عبر referrerpolicy="no-referrer" */}
         <div className="relative w-full aspect-video bg-black rounded-2xl overflow-hidden border border-zinc-800 shadow-2xl group">
-          
-          {/* علامة مائية باسم الموقع Logo Watermark */}
-          <div className="absolute top-4 right-4 z-10 pointer-events-none flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1 rounded-md border border-white/10 text-xs font-black tracking-wider text-red-500">
+          <div className="absolute top-4 right-4 z-10 pointer-events-none flex items-center gap-1.5 bg-black/60 backdrop-blur-md px-3 py-1 rounded-md border border-white/10 text-xs font-black text-red-500">
             <Sparkles className="w-3.5 h-3.5 text-yellow-500 animate-pulse" />
             <span>سينما بلاس VIP</span>
           </div>
@@ -144,7 +109,7 @@ export default function WatchPage() {
               onClick={handlePlayClick}
               className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/75 hover:bg-black/65 cursor-pointer transition"
               style={{
-                backgroundImage: media.poster_path ? `url(${media.poster_path})` : 'none',
+                backgroundImage: media.backdrop_path ? `url(${media.backdrop_path})` : (media.poster_path ? `url(${media.poster_path})` : 'none'),
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
               }}
@@ -154,11 +119,11 @@ export default function WatchPage() {
                 <div className="w-20 h-20 rounded-full bg-red-600 group-hover:bg-red-500 flex items-center justify-center text-white shadow-2xl shadow-red-600/60 transition-all transform group-hover:scale-110">
                   <Play className="w-10 h-10 fill-white translate-x-1" />
                 </div>
-                <h3 className="text-xl md:text-2xl font-black text-white">بدء المشاهدة بأعلى جودة</h3>
-                <p className="text-sm text-zinc-400">سيرفرات فائقة السرعة مع ترجمة عربية مدمجة</p>
+                <h3 className="text-xl md:text-2xl font-black text-white">انقر لبدء المشاهدة بأعلى جودة</h3>
+                <p className="text-sm text-zinc-400">سيرفرات أصلية مترجمة ترجمة مدمجة</p>
                 <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 px-4 py-1.5 rounded-full text-xs text-green-400">
                   <ShieldCheck className="w-4 h-4" />
-                  <span>سيرفر آمن بدون تقطيع</span>
+                  <span>سيرفرات آمنة وبدون تقطيع</span>
                 </div>
               </div>
             </div>
@@ -166,6 +131,7 @@ export default function WatchPage() {
             <iframe
               key={activeServerUrl}
               src={activeServerUrl}
+              referrerPolicy="no-referrer"
               className="w-full h-full border-0"
               allowFullScreen
               allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
@@ -180,7 +146,7 @@ export default function WatchPage() {
               <Server className="w-4 h-4 text-red-500" />
               <span>السيرفر الحالي: <span className="text-red-400">{activeServerName}</span></span>
             </div>
-            <span className="text-zinc-500 text-xs">قم بالتبديل فوراً في حال البطء</span>
+            <span className="text-zinc-500 text-xs">إذا لم يعمل سيرفر، قم بالتبديل فوراً</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
             {serverList.map((srv, idx) => (
@@ -194,7 +160,7 @@ export default function WatchPage() {
                 className={`py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 ${
                   activeServerUrl === srv.url
                     ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
-                    : 'bg-zinc-850 bg-zinc-800/80 text-zinc-400 hover:bg-zinc-700 hover:text-white'
+                    : 'bg-zinc-800/80 text-zinc-400 hover:bg-zinc-700 hover:text-white'
                 }`}
               >
                 <Play className="w-3 h-3 fill-current" />
@@ -204,38 +170,15 @@ export default function WatchPage() {
           </div>
         </div>
 
-        {/* قسم المواسم المرتبطة (إن وُجدت) مع بوسترات مختلفة */}
-        {sisterSeasons.length > 0 && (
-          <div className="bg-[#121216] border border-zinc-800 rounded-xl p-5 space-y-3">
-            <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-red-500" />
-              <span>المواسم الأخرى لهذا المسلسل:</span>
-            </h4>
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {sisterSeasons.map((s) => (
-                <Link
-                  key={s.id}
-                  href={`/watch/${s.id}`}
-                  className="group relative rounded-lg overflow-hidden border border-zinc-800 hover:border-red-600 transition"
-                >
-                  <img src={s.poster_path} alt={s.title} className="w-full aspect-[2/3] object-cover group-hover:scale-105 transition" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent flex flex-col justify-end p-2 text-center">
-                    <span className="text-xs font-bold text-white group-hover:text-red-400">
-                      الموسم {s.season_number || 'الجديد'}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* تفاصيل العمل وأزرار التحميل */}
+        {/* تفاصيل العمل والقصة والممثلين والبوستر بجودة فائقة */}
         <div className="bg-[#121216] border border-zinc-800 rounded-xl p-6 flex flex-col md:flex-row gap-6">
           <img
-            src={media.poster_path}
+            src={media.poster_path || "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg"}
             alt={media.title}
-            className="w-full md:w-56 aspect-[2/3] object-cover rounded-xl border border-zinc-800 shadow-md"
+            className="w-full md:w-56 aspect-[2/3] object-cover rounded-xl border border-zinc-800 shadow-xl"
+            onError={(e: any) => {
+              e.target.src = "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg";
+            }}
           />
           <div className="flex-1 space-y-4">
             <h1 className="text-2xl md:text-3xl font-black text-white">{media.title}</h1>
@@ -243,7 +186,7 @@ export default function WatchPage() {
             <div className="flex flex-wrap items-center gap-4 text-xs text-zinc-400">
               <span className="flex items-center gap-1 text-yellow-500 font-bold">
                 <Star className="w-4 h-4 fill-yellow-500" />
-                {media.vote_average || '8.6'}
+                {media.vote_average || '8.5'}
               </span>
               <span className="flex items-center gap-1">
                 <Calendar className="w-4 h-4" />
@@ -256,10 +199,23 @@ export default function WatchPage() {
             </div>
 
             <p className="text-zinc-300 leading-relaxed text-sm md:text-base">
-              {media.overview || 'قصة العمل متوفرة للمشاهدة المباشرة بدقة أصلية.'}
+              {media.overview || 'قصة الفيلم متوفرة للمشاهدة المباشرة بدقة أصلية عالية.'}
             </p>
 
-            {/* أزرار التحميل المباشر بأعلى عائد */}
+            {/* طاقم الممثلين */}
+            {media.cast_list && media.cast_list.length > 0 && (
+              <div className="pt-2">
+                <span className="text-xs text-zinc-500 flex items-center gap-1 mb-1 font-bold">
+                  <Users className="w-3.5 h-3.5 text-red-500" />
+                  طاقم العمل والبطولة:
+                </span>
+                <p className="text-xs md:text-sm text-zinc-300 font-semibold">
+                  {Array.isArray(media.cast_list) ? media.cast_list.join(' • ') : media.cast_list}
+                </p>
+              </div>
+            )}
+
+            {/* أزرار التحميل المباشر */}
             <div className="pt-4 flex flex-wrap gap-3">
               <a
                 href={DIRECT_AD_LINK}
@@ -268,7 +224,7 @@ export default function WatchPage() {
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold px-6 py-3 rounded-xl transition shadow-lg text-sm"
               >
                 <Download className="w-4 h-4" />
-                <span>تحميل بدقة 1080p FHD (سيرفر مباشر)</span>
+                <span>تحميل بدقة 1080p FHD (مباشر)</span>
               </a>
               <a
                 href={DIRECT_AD_LINK}
