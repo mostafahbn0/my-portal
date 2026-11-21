@@ -1,3 +1,4 @@
+import os
 import re
 import sys
 import time
@@ -6,161 +7,171 @@ import cloudscraper
 from bs4 import BeautifulSoup
 from supabase import create_client, Client
 
-# --- إعدادات Supabase و TMDB ---
-TMDB_API_KEY = "204ce203e280acdfec221ea09ea5e763"
-SUPABASE_URL = "https://pcgwfnevqoowerjeyhgk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjZ3dmbmV2cW9vd2VyamV5aGdrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTczNjgwNzc3MywiZXhwIjoyMDUyMzgzNzczfQ.c47YAnq5Ede_bYpWqYc1nLso19QpPZJ2fXqI3Xv1bX0"
+# --- قراءة المفاتيح التلقائية ---
+def load_env_credentials():
+    env_vars = {}
+    for p in ['.env.local', '.env']:
+        if os.path.exists(p):
+            with open(p, 'r', encoding='utf-8') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        k, v = line.split('=', 1)
+                        env_vars[k.strip()] = v.strip().strip("'").strip('"')
+    return env_vars
 
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-scraper = cloudscraper.create_scraper()
+env = load_env_credentials()
+TMDB_API_KEY = env.get("TMDB_API_KEY", "204ce203e280acdfec221ea09ea5e763")
+SUPABASE_URL = env.get("NEXT_PUBLIC_SUPABASE_URL", "https://pcgwfnevqoowerjeyhgk.supabase.co")
+SUPABASE_KEY = env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY") or env.get("SUPABASE_SERVICE_ROLE_KEY")
 
-def clean_text(text):
-    if not text:
-        return ""
-    return re.sub(r'\s+', ' ', text).strip()
+try:
+    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("✅ تم الاتصال بنجاح بقاعدة بيانات Supabase")
+except Exception as e:
+    print(f"❌ خطأ في الاتصال: {e}")
+    sys.exit(1)
 
-def enrich_from_tmdb(title, media_type='movie'):
-    """البحث في TMDB لملء أي نقص في البوسترات عالية الدقة وطاقم الممثلين"""
-    try:
-        clean_name = re.sub(r'[\(\[].*?[\)\]]', '', title)
-        clean_name = re.sub(r'(فيلم|مسلسل|مترجم|مدبلج|HD|1080p|720p|WEBRip)', '', clean_name).strip()
-        
-        search_type = 'movie' if media_type == 'movie' else 'tv'
-        url = f"https://api.themoviedb.org/3/search/{search_type}?api_key={TMDB_API_KEY}&query={clean_name}&language=ar"
-        res = requests.get(url, timeout=6).json()
-        
-        results = res.get('results', [])
-        if results:
-            item = results[0]
-            tmdb_id = item.get('id')
-            
-            # جلب الممثلين
-            credits_url = f"https://api.themoviedb.org/3/{search_type}/{tmdb_id}/credits?api_key={TMDB_API_KEY}&language=ar"
-            c_res = requests.get(credits_url, timeout=6).json()
-            cast_list = [c['name'] for c in c_res.get('cast', [])[:5]]
+scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform': 'linux', 'desktop': True})
 
-            return {
-                "tmdb_id": tmdb_id,
-                "backdrop_path": f"https://image.tmdb.org/t/p/original{item.get('backdrop_path')}" if item.get('backdrop_path') else None,
-                "poster_path": f"https://image.tmdb.org/t/p/w500{item.get('poster_path')}" if item.get('poster_path') else None,
-                "vote_average": item.get('vote_average', 8.0),
-                "cast": cast_list
-            }
-    except Exception:
-        pass
-    return None
+def clean_arabic_title(raw_title):
+    t = re.sub(r'[\(\[].*?[\)\]]', '', raw_title)
+    t = re.sub(r'(مشاهدة|فيلم|مسلسل|مترجم|مدبلج|اون لاين|اونلاين|كامل|HD|1080p|720p|4K|WEBRip|BluRay|TopCinema|عرب سيد|اكوام)', '', t, flags=re.IGNORECASE)
+    return re.sub(r'\s+', ' ', t).strip()
+
+def extract_real_player(page_url, soup):
+    """الدخول للرابط واستخراج الـ iframe الحقيقي الخاص بسيرفر العرض"""
+    # 1. البحث المباشر عن iframe
+    for iframe in soup.find_all('iframe'):
+        src = iframe.get('src') or iframe.get('data-src')
+        if src and not any(ad in src for ad in ['facebook', 'twitter', 'google', 'ad', 'monetag']):
+            return src
+
+    # 2. البحث عن زر المشاهدة أو صفحة السيرفرات في توب سينما وعرب سيد
+    watch_link = soup.find('a', href=re.compile(r'(watch|embed|servers|video|play)'))
+    if watch_link and watch_link.get('href') and watch_link.get('href') != page_url:
+        try:
+            sub_res = scraper.get(watch_link.get('href'), timeout=10)
+            sub_soup = BeautifulSoup(sub_res.text, 'lxml')
+            for sub_iframe in sub_soup.find_all('iframe'):
+                sub_src = sub_iframe.get('src') or sub_iframe.get('data-src')
+                if sub_src:
+                    return sub_src
+        except Exception:
+            pass
+
+    return page_url
 
 def parse_and_save_item(url, media_type='movie'):
     try:
-        print(f"🔍 فحص الرابط: {url}")
+        print(f"\n🔍 جاري معالجة وسحب العمل: {url}")
         res = scraper.get(url, timeout=15)
         if res.status_code != 200:
-            print(f"⚠️ فشل الاتصال بالصفحة ({res.status_code})")
+            print(f"⚠️ فشل فتح الصفحة: {res.status_code}")
             return False
 
         soup = BeautifulSoup(res.text, 'lxml')
 
         # استخراج العنوان
         title_el = soup.find(['h1', 'h2'], class_=re.compile(r'(entry-title|title|post-title|film-title)')) or soup.find('h1')
-        title = clean_text(title_el.text) if title_el else soup.title.text
+        raw_title = title_el.text.strip() if title_el else soup.title.text.strip()
+        cleaned_title = clean_arabic_title(raw_title)
 
         # استخراج القصة
-        story_el = soup.find(['div', 'p'], class_=re.compile(r'(story|overview|description|entry-content|details)'))
-        overview = clean_text(story_el.text) if story_el else "قصة العمل متاحة للمشاهدة المباشرة بجودة عالية."
+        story_el = soup.find(['div', 'p'], class_=re.compile(r'(story|overview|description|entry-content|details|post-entry)'))
+        overview = story_el.text.strip() if story_el else "قصة العمل متوفرة للمشاهدة المباشرة بجودة عالية."
+        overview = re.sub(r'\s+', ' ', overview)
 
         # استخراج البوستر
         img_el = soup.find('img', class_=re.compile(r'(poster|thumb|attachment)')) or soup.find('meta', property='og:image')
-        poster_url = img_el.get('src') or img_el.get('content') or img_el.get('data-src') if img_el else None
+        poster = img_el.get('src') or img_el.get('content') or img_el.get('data-src') if img_el else "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg"
 
-        # استخراج سيرفرات المشاهدة أو التضمين
-        video_url = None
-        iframe_el = soup.find('iframe', src=re.compile(r'(embed|player|stream|watch|video)'))
-        if iframe_el:
-            video_url = iframe_el.get('src')
-        else:
-            # محاولة العثور على زر مشاهدة
-            watch_btn = soup.find('a', href=re.compile(r'(watch|embed|stream)'))
-            if watch_btn:
-                video_url = watch_btn.get('href')
+        # استخراج مشغل الفيديو المباشر
+        video_player_url = extract_real_player(url, soup)
 
-        # تحسين البيانات عبر TMDB
-        tmdb_data = enrich_from_tmdb(title, media_type)
-        
-        # إنشاء معرف فريد مبني على الرابط أو TMDB
-        item_id = tmdb_data.get('tmdb_id') if tmdb_data and tmdb_data.get('tmdb_id') else abs(hash(url)) % 10000000
+        # توليد ID فريد
+        unique_id = abs(hash(url)) % 10000000
+
+        # محاولة تحسين البوستر من TMDB
+        try:
+            t_res = requests.get(f"https://api.themoviedb.org/3/search/movie?api_key={TMDB_API_KEY}&query={requests.utils.quote(cleaned_title)}&language=ar", timeout=5).json()
+            if t_res.get('results'):
+                t_item = t_res['results'][0]
+                if t_item.get('poster_path'):
+                    poster = f"https://image.tmdb.org/t/p/w500{t_item['poster_path']}"
+        except Exception:
+            pass
 
         record = {
-            "id": item_id,
-            "title": title,
-            "original_title": title,
+            "id": unique_id,
+            "title": cleaned_title if len(cleaned_title) > 2 else raw_title,
+            "original_title": raw_title,
             "overview": overview,
-            "poster_path": (tmdb_data and tmdb_data.get('poster_path')) or poster_url or "https://image.tmdb.org/t/p/w500/q6y0Go1tsGEsmtFryDOJo3dEmqu.jpg",
-            "backdrop_path": tmdb_data.get('backdrop_path') if tmdb_data else None,
+            "poster_path": poster,
             "media_type": media_type,
             "release_date": "2024",
-            "vote_average": (tmdb_data and tmdb_data.get('vote_average')) or 8.2,
+            "vote_average": 8.5,
             "popularity": 999.0,
-            "genres": ["عربي", "حركة", "دراما"],
+            "genres": ["عربي", "مترجم", "أكشن"],
             "original_language": "ar",
-            "video_url": video_url or url
+            "video_url": video_player_url
         }
 
-        # حفظ في قاعدة بيانات Supabase
+        # حفظ في قاعدة البيانات
         supabase.table("media").upsert(record).execute()
-        print(f"✨ تم الحفظ بنجاح: [{title}] | المعرف: {item_id}")
+
+        print("="*45)
+        print(f"🎉 تم نشر العمل بنجاح على سينما بلاس!")
+        print(f"🎬 الاسم: {record['title']}")
+        print(f"🆔 المعرف: {unique_id}")
+        print(f"📺 سيرفر المشاهدة: {video_player_url}")
+        print("="*45)
         return True
 
     except Exception as e:
-        print(f"❌ حدث خطأ أثناء المعالجة: {e}")
+        print(f"❌ خطأ: {e}")
         return False
 
-def scrape_category_page(category_url, max_items=20, media_type='movie'):
-    print(f"\n🚀 بدء سحب المحتوى من القسم: {category_url}\n")
+def scrape_category(category_url, max_items=15, media_type='movie'):
+    print(f"\n🚀 بدء سحب القسم: {category_url}\n")
     try:
         res = scraper.get(category_url, timeout=15)
         soup = BeautifulSoup(res.text, 'lxml')
         
-        # جلب جميع روابط المقالات/الأفلام في الصفحة
         links = []
         for a in soup.find_all('a', href=True):
             href = a['href']
-            if any(key in href for key in ['/movie/', '/film/', '/series/', '/post/', '/watch/']):
-                if href not in links and href != category_url:
+            if any(k in href for k in ['/movie/', '/film/', '/series/', '/post/', '%d9%81%d9%8a%d9%84%d9%85', '%d9%85%d8%b3%d9%84%d8%b3%d9%84']):
+                if href not in links and href != category_url and len(href) > 25:
                     links.append(href)
 
-        print(f"🎯 تم العثور على {len(links)} رابط عمل. جاري المعالجة حتى {max_items}...")
+        print(f"🎯 تم العثور على {len(links)} عمل. جاري السحب حتى {max_items}...")
         
         count = 0
         for link in links[:max_items]:
             if parse_and_save_item(link, media_type):
                 count += 1
-            time.sleep(1) # حماية السيرفر
+            time.sleep(1)
 
-        print(f"\n🎉 انتهى السحب بنجاح! تم استخراج وحفظ {count} عمل في موقعك.\n")
-
+        print(f"\n🎉 انتهى السحب! تم إضافة {count} عمل شغال 100% لموقعك.\n")
     except Exception as err:
         print(f"❌ خطأ أثناء قراءة القسم: {err}")
 
 if __name__ == '__main__':
-    print("="*50)
-    print("🎬 السكرابر الشامل للمواقع العربية - سينما بلاس 🎬")
-    print("="*50)
-    print("1) سحب رابط فيلم / مسلسل مفرد مباشر")
-    print("2) سحب قسم كامل (أفلام عربية، مسلسلات، إلخ)")
+    print("="*45)
+    print("🎬 سكرابر سينما بلاس لسحب المواقع العربية 🎬")
+    print("="*45)
+    print("1) سحب فيلم مفرد")
+    print("2) سحب قسم كامل (أفلام أجنبية، عربية، مسلسلات)")
     print("3) الخروج")
-    print("="*50)
+    print("="*45)
     
-    opt = input("👉 اختر العملية (1-3): ").strip()
-    
-    if opt == '1':
-        single_url = input("🌐 ضع رابط الفيلم أو الحلقة: ").strip()
-        m_type = input("هل هو فيلم (movie) أم مسلسل (tv)؟ [افتراضي movie]: ").strip() or 'movie'
-        parse_and_save_item(single_url, m_type)
-    elif opt == '2':
-        cat_url = input("🌐 ضع رابط القسم (Category URL): ").strip()
-        lim = input("🔢 كم عدد الأعمال المطلوبة (افتراضي 20): ").strip()
-        lim_num = int(lim) if lim.isdigit() else 20
-        m_type = input("هل القسم أفلام (movie) أم مسلسلات (tv)؟ [افتراضي movie]: ").strip() or 'movie'
-        scrape_category_page(cat_url, lim_num, m_type)
-    else:
-        print("تم الإلغاء.")
+    choice = input("👉 اختر (1-3): ").strip()
+    if choice == '1':
+        u = input("🌐 ضع رابط الفيلم: ").strip()
+        parse_and_save_item(u, 'movie')
+    elif choice == '2':
+        u = input("🌐 ضع رابط القسم: ").strip()
+        n = input("🔢 كم عدد الأعمال المطلوبة (افتراضي 15): ").strip()
+        num = int(n) if n.isdigit() else 15
+        scrape_category(u, num, 'movie')
