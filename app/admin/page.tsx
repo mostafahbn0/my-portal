@@ -211,7 +211,7 @@ export default function AdminDashboard() {
           <form onSubmit={handleLogin} className="space-y-4">
             <input
               type="password"
-              placeholder="الرمز السري (الافتراضي: admin2025)"
+              placeholder="الرمز السري (أدخل رمز الإدارة السري)"
               value={pinInput}
               onChange={(e) => setPinInput(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg tracking-widest text-white focus:outline-none focus:border-red-500"

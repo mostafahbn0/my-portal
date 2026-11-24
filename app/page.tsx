@@ -11,6 +11,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const TMDB_API_KEY = '204ce203e280acdfec221ea09ea5e763';
 
+// مكوّن السلايدر الأفقي
 function MediaSlider({
   title,
   icon,
@@ -160,6 +161,7 @@ export default function HomePage() {
   const [settings, setSettings] = useState<any>({ ramadan_mode: true });
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState<'all' | 'movies' | 'series' | 'ramadan' | 'anime' | 'upcoming'>('all');
   const [heroIndex, setHeroIndex] = useState(0);
 
   useEffect(() => {
@@ -221,10 +223,11 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans overflow-x-hidden" dir="rtl">
-      {/* هيدر متناسق بدقة */}
+      {/* الهيدر المتكامل الفاخر */}
       <header className="sticky top-0 z-50 bg-slate-950/95 backdrop-blur-md border-b border-slate-900 px-4 md:px-8 py-3 w-full">
-        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
-          <Link href="/" className="flex items-center gap-2 flex-shrink-0">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+          {/* الشعار */}
+          <Link href="/" onClick={() => setActiveTab('all')} className="flex items-center gap-2.5 flex-shrink-0">
             <span className="w-10 h-10 bg-red-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-lg shadow-red-600/30">
               ▶
             </span>
@@ -234,7 +237,52 @@ export default function HomePage() {
             </div>
           </Link>
 
-          <div className="flex-1 max-w-md mx-2 sm:mx-4">
+          {/* روابط الأقسام على أجهزة الكمبيوتر والشاشات الكبيرة */}
+          <nav className="hidden xl:flex items-center gap-1 bg-slate-900/80 p-1 rounded-2xl border border-slate-800/80">
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${activeTab === 'all' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              الرئيسية
+            </button>
+            <button
+              onClick={() => setActiveTab('movies')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${activeTab === 'movies' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              🎬 أفلام
+            </button>
+            <button
+              onClick={() => setActiveTab('series')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${activeTab === 'series' ? 'bg-red-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              📺 مسلسلات
+            </button>
+            <button
+              onClick={() => setActiveTab('ramadan')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition ${
+                activeTab === 'ramadan'
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20'
+                  : 'text-amber-400 hover:text-amber-300 bg-amber-500/10'
+              }`}
+            >
+              🌙 مسلسلات رمضان 2025
+            </button>
+            <button
+              onClick={() => setActiveTab('anime')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${activeTab === 'anime' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              ⚔️ أنمي
+            </button>
+            <button
+              onClick={() => setActiveTab('upcoming')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${activeTab === 'upcoming' ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-white'}`}
+            >
+              ⏳ قريباً
+            </button>
+          </nav>
+
+          {/* شريط البحث المباشر */}
+          <div className="flex-1 max-w-xs md:max-w-sm">
             <div className="relative w-full">
               <input
                 type="text"
@@ -250,26 +298,31 @@ export default function HomePage() {
             </div>
           </div>
 
+          {/* فشار الحظ */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <button
               onClick={handleLuckyPopcorn}
               title="اختر عملاً عشوائياً لمشاهدته الآن!"
-              className="px-3.5 py-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
             >
               <span>🍿</span>
               <span className="hidden sm:inline">فشار الحظ</span>
             </button>
-
-            <Link
-              href="/admin"
-              className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 rounded-xl text-xs font-bold transition flex items-center gap-1"
-            >
-              ⚙️ <span className="hidden md:inline">الإدارة</span>
-            </Link>
           </div>
+        </div>
+
+        {/* شريط الأقسام السريع للموبايل */}
+        <div className="xl:hidden flex items-center gap-2 overflow-x-auto scrollbar-none pt-2.5 mt-2 border-t border-slate-900 text-xs whitespace-nowrap">
+          <button onClick={() => setActiveTab('all')} className={`px-3 py-1 rounded-lg font-bold ${activeTab === 'all' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-400'}`}>الكل</button>
+          <button onClick={() => setActiveTab('ramadan')} className={`px-3 py-1 rounded-lg font-black ${activeTab === 'ramadan' ? 'bg-amber-500 text-slate-950' : 'bg-amber-500/10 text-amber-400'}`}>🌙 مسلسلات رمضان</button>
+          <button onClick={() => setActiveTab('movies')} className={`px-3 py-1 rounded-lg font-bold ${activeTab === 'movies' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-400'}`}>🎬 أفلام</button>
+          <button onClick={() => setActiveTab('series')} className={`px-3 py-1 rounded-lg font-bold ${activeTab === 'series' ? 'bg-red-600 text-white' : 'bg-slate-900 text-slate-400'}`}>📺 مسلسلات</button>
+          <button onClick={() => setActiveTab('anime')} className={`px-3 py-1 rounded-lg font-bold ${activeTab === 'anime' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-400'}`}>⚔️ أنمي</button>
+          <button onClick={() => setActiveTab('upcoming')} className={`px-3 py-1 rounded-lg font-bold ${activeTab === 'upcoming' ? 'bg-slate-800 text-white' : 'bg-slate-900 text-slate-400'}`}>⏳ قريباً</button>
         </div>
       </header>
 
+      {/* عرض نتائج البحث */}
       {searchQuery ? (
         <main className="max-w-7xl w-full mx-auto p-4 md:p-8 space-y-4">
           <h2 className="text-sm font-bold text-slate-400">نتائج البحث عن: "{searchQuery}" ({searchResults.length})</h2>
@@ -288,7 +341,8 @@ export default function HomePage() {
         </main>
       ) : (
         <>
-          {currentHero && (
+          {/* البانر الهيرو 4K */}
+          {currentHero && activeTab === 'all' && (
             <section className="relative w-full h-[55vh] md:h-[65vh] overflow-hidden bg-black">
               <img
                 src={
@@ -353,45 +407,124 @@ export default function HomePage() {
             </section>
           )}
 
+          {/* محتوى الأقسام والسلايدرات حسب التبويب المختار */}
           <main className="max-w-7xl w-full mx-auto px-4 md:px-8 py-8 space-y-10">
-            {settings.ramadan_mode && ramadanItems.length > 0 && (
-              <div className="bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-amber-950/10 p-4 rounded-3xl border border-amber-500/20">
-                <MediaSlider title="مسلسلات رمضان 2025 الحصرية" icon="🌙" items={ramadanItems} isGold={true} badgeText="رمضان 2025" />
+            {/* في حال اختيار الرئيسية: تظهر جميع السلايدرات */}
+            {activeTab === 'all' && (
+              <>
+                {settings.ramadan_mode && ramadanItems.length > 0 && (
+                  <div className="bg-gradient-to-r from-amber-950/20 via-slate-900/50 to-amber-950/10 p-4 rounded-3xl border border-amber-500/20">
+                    <MediaSlider title="مسلسلات رمضان 2025 الحصرية" icon="🌙" items={ramadanItems} isGold={true} badgeText="رمضان 2025" />
+                  </div>
+                )}
+                <MediaSlider title="أحدث المسلسلات العالمية ونتفليكس (كامل الحلقات)" icon="📺" items={activeSeries} badgeText="مسلسل VIP" />
+                {latestAdded.length > 0 && (
+                  <MediaSlider title="آخر الإضافات على سينما بلاس" icon="⚡" items={latestAdded} badgeText="جديد اليوم" />
+                )}
+                <MediaSlider title="أحدث أفلام السينما العالمية 2024 / 2025" icon="🎬" items={latestMovies} badgeText="فيلم VIP" />
+                {latestAnime.length > 0 && (
+                  <MediaSlider title="آخر حلقات الأنمي الأسبوعية المترجمة" icon="⚔️" items={latestAnime} badgeText="أنمي أسبوعي" />
+                )}
+                <div className="bg-slate-900/30 p-4 rounded-3xl border border-indigo-500/20">
+                  <MediaSlider title="قريباً في السينما (أفلام أعلن عنها قادمة 2025)" icon="⏳" items={upcomingMovies} isUpcoming={true} badgeText="قريباً" />
+                </div>
+                <MediaSlider title="الأكثر مشاهدة والأعلى تقييماً هذا الأسبوع" icon="🔥" items={trendingNow} badgeText="تريند VIP" />
+              </>
+            )}
+
+            {/* صفحة مسلسلات رمضان المستقلة */}
+            {activeTab === 'ramadan' && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🌙</span>
+                  <div>
+                    <h2 className="text-xl font-black text-amber-400">جميع مسلسلات رمضان 2025</h2>
+                    <p className="text-xs text-slate-400">الحلقات الرسمية الحصرية بدقة 4K وبدون فواصل مملة</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {ramadanItems.map((item) => (
+                    <Link key={item.id} href={`/media/${item.id}`} className="bg-slate-900 border border-amber-500/30 rounded-xl overflow-hidden hover:border-amber-400 transition">
+                      <img src={item.poster_path} alt={item.title} className="w-full aspect-[2/3] object-cover" />
+                      <p className="p-2 text-xs font-bold text-white truncate">{item.title}</p>
+                    </Link>
+                  ))}
+                </div>
               </div>
             )}
 
-            <MediaSlider
-              title="أحدث المسلسلات العالمية ونتفليكس (كامل الحلقات)"
-              icon="📺"
-              items={activeSeries}
-              badgeText="مسلسل VIP"
-            />
-
-            {latestAdded.length > 0 && (
-              <MediaSlider title="آخر الإضافات على سينما بلاس" icon="⚡" items={latestAdded} badgeText="جديد اليوم" />
+            {/* صفحة الأفلام المستقلة */}
+            {activeTab === 'movies' && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-white">🎬 مكتبة أفلام السينما وهوليوود</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {latestMovies.map((item) => (
+                    <Link key={item.id} href={`/media/${item.id}`} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500 transition">
+                      <img src={item.poster_path} alt={item.title} className="w-full aspect-[2/3] object-cover" />
+                      <p className="p-2 text-xs font-bold text-white truncate">{item.title}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             )}
 
-            <MediaSlider title="أحدث أفلام السينما العالمية 2024 / 2025" icon="🎬" items={latestMovies} badgeText="فيلم VIP" />
-
-            {latestAnime.length > 0 && (
-              <MediaSlider title="آخر حلقات الأنمي الأسبوعية المترجمة" icon="⚔️" items={latestAnime} badgeText="أنمي أسبوعي" />
+            {/* صفحة المسلسلات المستقلة */}
+            {activeTab === 'series' && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-white">📺 المسلسلات الأجنبية والمسلسلات الحصرية</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {activeSeries.map((item) => (
+                    <Link key={item.id} href={`/media/${item.id}`} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-red-500 transition">
+                      <img
+                        src={item.poster_path ? (item.poster_path.startsWith('http') ? item.poster_path : `https://image.tmdb.org/t/p/w500${item.poster_path}`) : 'https://placehold.co/300x450'}
+                        alt={item.title || item.name}
+                        className="w-full aspect-[2/3] object-cover"
+                      />
+                      <p className="p-2 text-xs font-bold text-white truncate">{item.title || item.name}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
             )}
 
-            <div className="bg-slate-900/30 p-4 rounded-3xl border border-indigo-500/20">
-              <MediaSlider
-                title="قريباً في السينما (أفلام أعلن عنها قادمة 2025)"
-                icon="⏳"
-                items={upcomingMovies}
-                isUpcoming={true}
-                badgeText="قريباً"
-              />
-            </div>
+            {/* صفحة الأنمي المستقلة */}
+            {activeTab === 'anime' && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-white">⚔️ سلاسل الأنمي المترجمة</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {latestAnime.map((item) => (
+                    <Link key={item.id} href={`/media/${item.id}`} className="bg-slate-900 border border-indigo-500/30 rounded-xl overflow-hidden hover:border-indigo-400 transition">
+                      <img src={item.poster_path} alt={item.title} className="w-full aspect-[2/3] object-cover" />
+                      <p className="p-2 text-xs font-bold text-white truncate">{item.title}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
 
-            <MediaSlider title="الأكثر مشاهدة والأعلى تقييماً هذا الأسبوع" icon="🔥" items={trendingNow} badgeText="تريند VIP" />
+            {/* صفحة قريباً في السينما */}
+            {activeTab === 'upcoming' && (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-indigo-400">⏳ قريباً في صالات السينما 2025</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                  {upcomingMovies.map((item) => (
+                    <Link key={item.id} href={`/media/${item.id}`} className="bg-slate-900 border border-indigo-500/30 rounded-xl overflow-hidden hover:border-indigo-400 transition">
+                      <img
+                        src={item.poster_path ? `https://image.tmdb.org/t/p/w500${item.poster_path}` : 'https://placehold.co/300x450'}
+                        alt={item.title}
+                        className="w-full aspect-[2/3] object-cover"
+                      />
+                      <p className="p-2 text-xs font-bold text-white truncate">{item.title}</p>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
           </main>
         </>
       )}
 
+      {/* الفوتر */}
       <footer className="mt-auto bg-slate-950 border-t border-slate-900 py-8 px-6 text-center text-xs text-slate-500 space-y-2">
         <p className="font-bold text-slate-400">منصة سينما بلاس VIP — بوابتك الترفيهية الأولى</p>
         <p className="text-[10px]">سيرفرات سريعة بدقة 4K مع ترجمة عربية فورية © 2025</p>
