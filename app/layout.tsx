@@ -1,22 +1,9 @@
 import type { Metadata } from 'next';
-import { Tajawal } from 'next/font/google';
 import './globals.css';
-import Navbar from '@/components/Navbar';
-import Script from 'next/script';
-
-const tajawal = Tajawal({
-  subsets: ['arabic'],
-  weight: ['300', '400', '500', '700', '900'],
-  variable: '--font-tajawal',
-});
 
 export const metadata: Metadata = {
-  title: 'سينما بلاس | Cinema Plus - مشاهدة وتحميل أفلام ومسلسلات مترجمة مجاناً',
-  description: 'منصة سينما بلاس الأولى عربياً لمشاهدة أحدث أفلام هوليوود، مسلسلات نيتفلكس، والأنمي المترجم بجودة عالية 1080p و 4K بدون تقطيع.',
-  metadataBase: new URL('https://my-portal-nu-liart.vercel.app'),
-  icons: {
-    icon: '/favicon.ico',
-  },
+  title: 'سينما بلاس VIP | مشاهدة أحدث الأفلام والمسلسلات 4K مجاناً',
+  description: 'منصة سينما بلاس لمشاهدة وتحميل أحدث أفلام هوليوود ومسلسلات نتفليكس ومسلسلات رمضان 2025 والأنمي مجاناً بأعلى جودة.',
 };
 
 export default function RootLayout({
@@ -25,20 +12,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ar" dir="rtl" className={tajawal.variable}>
-      <head>
-        <meta httpEquiv="Content-Security-Policy" content="upgrade-insecure-requests" />
-        <meta name="monetag" content="3e81a1f47455d827e8622e53ef6a6ed9" />
-
-        {/* 1. Monetag Vignette Ads (إعلانات بينية عالية الربح وآمنة) */}
-        <script src="https://n6wxm.com/vignette.min.js" data-zone="12311724" data-cfasync="false" async></script>
-
-        {/* 2. Monetag Popunder Safe MultiTag */}
-        <script src="https://5gvci.com/act/files/tag.min.js?z=12311722" data-cfasync="false" async></script>
-      </head>
-      <body className="bg-[#08080a] text-white font-sans antialiased min-h-screen selection:bg-red-600 selection:text-white">
-        <Navbar />
-        <main>{children}</main>
+    <html lang="ar" dir="rtl">
+      <body className="bg-slate-950 text-slate-100 antialiased min-h-screen">
+        {children}
       </body>
     </html>
   );
