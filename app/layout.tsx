@@ -3,7 +3,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'سينما بلاس VIP | مشاهدة أحدث الأفلام والمسلسلات 4K مجاناً',
-  description: 'منصة سينما بلاس لمشاهدة وتحميل أحدث أفلام هوليوود ومسلسلات نتفليكس ومسلسلات رمضان 2025 والأنمي مجاناً بأعلى جودة.',
+  description: 'منصة سينما بلاس لمشاهدة أحدث الأفلام والمسلسلات مجاناً.',
 };
 
 export default function RootLayout({
